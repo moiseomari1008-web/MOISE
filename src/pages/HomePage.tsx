@@ -145,59 +145,85 @@ export const HomePage: React.FC = () => {
     <div>
       {/* 1. Hero Section — Red, Yellow & White Brand Presence */}
       <section className="border-b border-[#F4B400]/35 bg-white">
-        <div className="mx-auto grid max-w-7xl items-stretch gap-8 px-4 py-10 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:py-16">
-          <div className="flex flex-col justify-center lg:col-span-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-[#D90A14]">
-              {settings.legalName} · Kinshasa, Gombe
-            </p>
-            <h1 className="mt-3 font-display text-4xl font-extrabold leading-[1.08] tracking-tight text-slate-900 sm:text-5xl text-balance">
-              {settings.promise}
-            </h1>
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-              {settings.vision}
-            </p>
+        <div className="mx-auto grid max-w-7xl items-center gap-6 px-4 py-8 sm:px-6 md:grid-cols-12 lg:gap-10 lg:py-12">
+          <div className="relative flex flex-col justify-center overflow-hidden rounded-2xl border border-[#F4B400]/50 bg-slate-950 p-5 sm:p-7 md:col-span-7">
+            <img
+              src="/assets/aistudio/image_c323a419.png"
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-100 brightness-125 contrast-105"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/55 to-slate-950/25"
+            />
+            <div className="relative z-10">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#FBBF24] sm:text-xs">
+                {settings.legalName} · Kinshasa, Gombe
+              </p>
+              <h1 className="mt-2.5 font-display text-3xl font-extrabold leading-[1.1] tracking-tight text-white drop-shadow-sm sm:text-4xl lg:text-[42px] text-balance">
+                {settings.promise}
+              </h1>
+              <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-slate-100 drop-shadow-sm sm:text-base">
+                {settings.vision}
+              </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/tech')}
-                className="inline-flex h-12 items-center gap-2 rounded-lg bg-[#D90A14] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#b80811] whitespace-nowrap shrink-0"
-              >
-                Voir les ordinateurs
-                <ArrowRight className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/suivi')}
-                className="inline-flex h-12 items-center gap-2 rounded-lg border border-[#F4B400] bg-[#FEF3C7] px-5 text-sm font-bold text-[#78350F] transition-colors hover:bg-[#FDE68A] whitespace-nowrap shrink-0"
-              >
-                Suivre mon dossier
-              </button>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/tech')}
+                  className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#D90A14] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#b80811] sm:h-12 sm:px-6 sm:whitespace-nowrap"
+                >
+                  Voir les ordinateurs
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/suivi')}
+                  className="inline-flex h-11 items-center gap-2 rounded-lg border border-[#F4B400] bg-[#FEF3C7] px-4 text-sm font-bold text-[#78350F] transition-colors hover:bg-[#FDE68A] sm:h-12 sm:px-5 sm:whitespace-nowrap"
+                >
+                  Suivre mon dossier
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="lg:col-span-6">
-            <AnimatedPhotoShowcase
-              slides={heroSlides}
-              aspectClass="aspect-[16/10] lg:h-full lg:min-h-[340px]"
-              className="rounded-xl border border-[#D90A14]/20"
-              intervalMs={5200}
-              priority
-            />
+          <div className="flex justify-center md:col-span-5">
+            <div className="w-full max-w-[340px] sm:max-w-[390px] lg:max-w-[430px]">
+              <AnimatedPhotoShowcase
+                slides={heroSlides}
+                aspectClass="aspect-[16/10] max-h-[205px] sm:max-h-[235px] lg:max-h-[255px]"
+                className="rounded-xl border border-[#D90A14]/25 shadow-sm"
+                intervalMs={5200}
+                priority
+              />
+            </div>
           </div>
         </div>
 
-        {/* 4 Pôles strip directly visible for <10s orientation */}
-        <div className="border-t border-[#F4B400]/30 bg-[#FFFDF5]">
-          <div className="mx-auto grid max-w-7xl divide-y divide-[#F4B400]/25 sm:grid-cols-2 sm:divide-y-0 sm:divide-x lg:grid-cols-4">
-            {poles.map((pole) => {
+        {/* 4 Pôles strip with computer-sales showroom backdrop */}
+        <div className="relative overflow-hidden border-t border-[#F4B400]/35 bg-[#FFFDF5]">
+          <img
+            src="/src/assets/images/poles_laptop_sales_bg_1795518479491.jpg"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-80 brightness-110 contrast-105"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#FFFDF5]/42 via-[#FFFDF5]/50 to-[#FFFDF5]/56"
+          />
+          <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 divide-y divide-[#F4B400]/30 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
+            {poles.map((pole, idx) => {
               const Icon = pole.icon;
               return (
                 <button
                   key={pole.to}
                   type="button"
                   onClick={() => navigate(pole.to)}
-                  className="group flex flex-col justify-between p-6 text-left transition-colors hover:bg-white"
+                  className={`group flex flex-col justify-between p-5 text-left transition-colors hover:bg-white/75 sm:p-6 ${
+                    idx < 2 ? 'sm:border-b sm:border-[#F4B400]/30 lg:border-b-0' : ''
+                  } ${idx % 2 === 0 ? 'sm:border-r sm:border-[#F4B400]/30 lg:border-r-0' : ''}`}
                 >
                   <div>
                     <div className="flex items-center justify-between">
@@ -207,7 +233,7 @@ export const HomePage: React.FC = () => {
                     <h2 className="mt-3 font-display text-lg font-bold text-slate-900 group-hover:text-[#D90A14]">
                       {pole.title}
                     </h2>
-                    <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{pole.desc}</p>
+                    <p className="mt-1.5 text-sm font-medium leading-relaxed text-slate-800">{pole.desc}</p>
                   </div>
                   <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#D90A14]">
                     {pole.cta}
@@ -327,16 +353,16 @@ export const HomePage: React.FC = () => {
 
       {/* 3. Campagne de Bourse en cours + Photo de famille 1ère édition */}
       <Reveal className="border-y border-[#F4B400]/35 bg-[#FFFDF5]">
-        <div className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-14 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:py-20">
-          <div className="lg:col-span-6">
+        <div className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-12 lg:gap-12 lg:py-20">
+          <div className="mx-auto w-full max-w-lg md:col-span-6 md:max-w-none">
             <AnimatedPhotoShowcase
               slides={boursesSlides}
-              aspectClass="aspect-[16/10]"
+              aspectClass="aspect-[16/10] max-h-[250px] sm:max-h-[300px]"
               className="rounded-xl border border-[#F4B400]/40"
               intervalMs={4600}
             />
           </div>
-          <div className="lg:col-span-6">
+          <div className="md:col-span-6">
             <p className="text-xs font-bold uppercase tracking-wider text-[#B45309]">04 · Œuvre sociale Lomakrev</p>
             <h2 className="mt-2 font-display text-2xl font-bold text-slate-900 sm:text-3xl text-balance">
               {openCampaign ? openCampaign.title : 'Programme de Bourses Lomakrev'}
@@ -387,63 +413,78 @@ export const HomePage: React.FC = () => {
       </Reveal>
 
       {/* 4. Lomakrev Académie + Chiffres clés & Publics */}
-      <Reveal className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-20">
-        <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
-          <div className="lg:col-span-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-[#D90A14]">02 · Lomakrev Académie — « Way of success »</p>
-            <h2 className="mt-2 font-display text-2xl font-bold text-slate-900 sm:text-3xl text-balance">
-              7 parcours pratiques pour la relance 2027
-            </h2>
-            <p className="mt-3 text-base leading-relaxed text-slate-600">
-              Excel pour les entreprises, Word & PowerPoint, Maintenance informatique, Cybersécurité, IA appliquée, Entrepreneuriat et Gestion de projet.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/academie')}
-                className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#D90A14] px-5 text-sm font-semibold text-white hover:bg-[#b80811]"
-              >
-                Découvrir les 7 formations
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/maintenance/devis')}
-                className="inline-flex h-11 items-center rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-5 text-sm font-semibold text-[#78350F] hover:bg-[#FEF3C7]"
-              >
-                Formation entreprise
-              </button>
-            </div>
-          </div>
-
-          <div className="lg:col-span-7">
-            <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
-              {formations.slice(0, 5).map((f) => {
-                const hasOpen = f.sessions.some((s) => s.isOpen);
-                return (
+      <Reveal className="relative overflow-hidden bg-white">
+        <div className="relative">
+          <img
+            src="/src/assets/images/academie_camera_cachee_1795519273657.jpg"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-45 brightness-105"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/75 via-white/60 to-white/72"
+          />
+          <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-20">
+            <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
+              <div className="lg:col-span-5">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#D90A14]">02 · Lomakrev Académie — « Way of success »</p>
+                <h2 className="mt-2 font-display text-2xl font-bold text-slate-900 sm:text-3xl text-balance">
+                  7 parcours pratiques pour la relance 2027
+                </h2>
+                <p className="mt-3 text-base font-medium leading-relaxed text-slate-700">
+                  Excel pour les entreprises, Word & PowerPoint, Maintenance informatique, Cybersécurité, IA appliquée, Entrepreneuriat et Gestion de projet.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
                   <button
-                    key={f.id}
                     type="button"
-                    onClick={() => navigate(`/academie/formations/${f.slug}`)}
-                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[#FFFDF5]"
+                    onClick={() => navigate('/academie')}
+                    className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#D90A14] px-5 text-sm font-semibold text-white hover:bg-[#b80811]"
                   >
-                    <div>
-                      <p className="font-semibold text-slate-900">{f.title}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {f.durationHours} h · {f.level} · {f.audience}
-                      </p>
-                    </div>
-                    <span className={`text-xs font-semibold whitespace-nowrap ${hasOpen ? 'text-[#D90A14]' : 'text-[#B45309]'}`}>
-                      {hasOpen ? 'Session ouverte →' : 'À venir →'}
-                    </span>
+                    Découvrir les 7 formations
                   </button>
-                );
-              })}
+                  <button
+                    type="button"
+                    onClick={() => navigate('/maintenance/devis')}
+                    className="inline-flex h-11 items-center rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-5 text-sm font-semibold text-[#78350F] hover:bg-[#FEF3C7]"
+                  >
+                    Formation entreprise
+                  </button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-7">
+                <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white/85 backdrop-blur-[2px]">
+                  {formations.slice(0, 5).map((f) => {
+                    const hasOpen = f.sessions.some((s) => s.isOpen);
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => navigate(`/academie/formations/${f.slug}`)}
+                        className="flex w-full flex-col items-start justify-between gap-2 px-4 py-4 text-left transition-colors hover:bg-[#FFFDF5]/90 sm:flex-row sm:items-center sm:gap-4 sm:px-5"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900">{f.title}</p>
+                          <p className="mt-0.5 text-xs text-slate-600">
+                            {f.durationHours} h · {f.level} · {f.audience}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 text-xs font-semibold whitespace-nowrap ${hasOpen ? 'text-[#D90A14]' : 'text-[#B45309]'}`}>
+                          {hasOpen ? 'Session ouverte →' : 'À venir →'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Chiffres clés & Clients types */}
-        <div className="mt-14 grid gap-6 border-t border-slate-200 pt-12 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:pb-20">
+          {/* Chiffres clés & Clients types */}
+          <div className="grid gap-6 border-t border-slate-200 pt-12 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-[#F4B400]/40 bg-[#FFFDF5] p-5">
             <p className="font-mono-tabular text-3xl font-extrabold text-[#D90A14]">{settings.stats.ordinateursVendus}</p>
             <p className="mt-1 text-sm text-slate-700">Ordinateurs livrés et contrôlés</p>
@@ -514,6 +555,7 @@ export const HomePage: React.FC = () => {
                 Demander une intervention
               </button>
             </div>
+          </div>
           </div>
         </div>
       </Reveal>

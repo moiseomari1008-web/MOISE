@@ -80,7 +80,7 @@ export const TechCatalogPage: React.FC = () => {
 
       {/* Filters */}
       <div className="mt-6 rounded-xl border border-[#F4B400]/40 bg-[#FFFDF5] p-4 sm:p-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#78350F]">
             <SlidersHorizontal className="h-3.5 w-3.5 text-[#D90A14]" />
             Filtrer le catalogue
@@ -265,13 +265,13 @@ export const TechProductDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
             priority
           />
           {product.images.length > 1 && (
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2.5 sm:gap-3">
               {product.images.map((img, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => setActiveImage(i)}
-                  className={`h-20 w-28 overflow-hidden rounded-lg border-2 ${activeImage === i ? 'border-[#D90A14]' : 'border-slate-200'}`}
+                  className={`h-16 w-24 overflow-hidden rounded-lg border-2 sm:h-20 sm:w-28 ${activeImage === i ? 'border-[#D90A14]' : 'border-slate-200'}`}
                 >
                   <img src={img} alt={`${product.model} vue ${i + 1}`} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                 </button>
@@ -348,7 +348,7 @@ export const TechProductDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
                 Ajouter au panier
               </button>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <ShareButton title={`${product.model} — ${product.priceUsd} USD chez Lomakrev`} className="w-full justify-center" />
                 <a
                   href={buildWhatsAppDirectContact(

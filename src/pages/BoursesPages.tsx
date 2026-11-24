@@ -149,7 +149,7 @@ export const BoursesHomePage: React.FC = () => {
           <h2 className="font-display text-xl font-bold text-slate-900">Éditions précédentes & archives</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             {closedCampaigns.map((camp) => (
-              <div key={camp.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div key={camp.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <div>
                   <p className="text-xs font-medium text-slate-500">Clôturée le {formatDateFr(camp.closeDate)}</p>
                   <p className="mt-1 font-display text-base font-bold text-slate-900">{camp.title}</p>
@@ -157,7 +157,7 @@ export const BoursesHomePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(`/bourses/campagnes/${camp.slug}`)}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 whitespace-nowrap"
+                  className="w-fit rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 whitespace-nowrap"
                 >
                   Consulter
                 </button>
@@ -243,7 +243,7 @@ export const BourseCampaignDetailPage: React.FC<{ slug: string }> = ({ slug }) =
 
           <p className="mt-4 text-base leading-relaxed text-slate-600">{camp.description}</p>
 
-          <div className="mt-6 grid gap-4 border-y border-slate-200 py-5 sm:grid-cols-4 text-sm">
+          <div className="mt-6 grid grid-cols-2 gap-4 border-y border-slate-200 py-5 md:grid-cols-4 text-sm">
             <div>
               <span className="flex items-center gap-1.5 text-xs text-slate-500"><Users className="h-3.5 w-3.5" /> Places</span>
               <span className="mt-1 block font-mono-tabular font-bold text-slate-900">{camp.places}</span>

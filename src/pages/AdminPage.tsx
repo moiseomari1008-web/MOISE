@@ -553,7 +553,7 @@ export const AdminPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="print-sheet mx-auto max-w-4xl rounded-xl border border-slate-300 bg-white p-6 sm:p-8">
+        <div className="print-sheet mx-auto max-w-4xl overflow-x-auto rounded-xl border border-slate-300 bg-white p-4 sm:p-8 print:overflow-visible">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-[#D90A14] pb-5">
             <div className="flex items-center gap-3.5">
               <img src={settings.logoUrl} alt="LOMAKREV GROUP" className="h-14 w-auto rounded object-contain" referrerPolicy="no-referrer" />
@@ -1653,10 +1653,17 @@ export const AdminPage: React.FC = () => {
   const technicians = usersList.filter((u) => u.role === 'TECHNICIEN' && u.active);
 
   return (
-    <div className="flex min-h-screen bg-[#FFFDF5]">
+    <div className="flex min-h-screen overflow-x-clip bg-[#FFFDF5]">
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+          className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
+        />
+      )}
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-[#F4B400]/40 bg-white transition-transform lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex h-16 items-center justify-between border-b border-[#F4B400]/40 border-t-4 border-t-[#D90A14] px-5">
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col overflow-y-auto border-r border-[#F4B400]/40 bg-white transition-transform lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#F4B400]/40 border-t-4 border-t-[#D90A14] px-5">
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 text-left">
             <img
               src={data?.settings?.logoUrl || '/assets/aistudio/WhatsApp_Image_2026-11-20_at_11.31.55_6695b86a.jpeg'}
@@ -1671,7 +1678,7 @@ export const AdminPage: React.FC = () => {
           </button>
         </div>
 
-        <nav className="space-y-1 p-3">
+        <nav className="flex-1 space-y-1 p-3">
           {navItems
             .filter((n) => n.show)
             .map((item) => {
@@ -1707,7 +1714,7 @@ export const AdminPage: React.FC = () => {
             })}
         </nav>
 
-        <div className="absolute inset-x-0 bottom-0 border-t border-[#F4B400]/40 bg-[#FFFDF5] p-4">
+        <div className="mt-auto shrink-0 border-t border-[#F4B400]/40 bg-[#FFFDF5] p-4">
           <button
             type="button"
             onClick={() => {
@@ -1792,7 +1799,7 @@ export const AdminPage: React.FC = () => {
                 </button>
 
                 {notifPanelOpen && (
-                  <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-[#F4B400]/60 bg-white shadow-xl sm:w-96">
+                  <div className="fixed inset-x-4 top-20 z-50 overflow-hidden rounded-2xl border border-[#F4B400]/60 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
                     <div className="flex items-center justify-between border-b border-slate-100 bg-[#FFFDF5] px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Bell className="h-4 w-4 text-[#D90A14]" />
@@ -1977,7 +1984,7 @@ export const AdminPage: React.FC = () => {
           {activeTab === 'dossiers' && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
-                <div className="relative min-w-[220px] flex-1">
+                <div className="relative w-full sm:min-w-[220px] sm:flex-1">
                   <input
                     type="text"
                     name="lomakrev-admin-search"
@@ -2889,7 +2896,7 @@ export const AdminPage: React.FC = () => {
                       <div>
                         <p className="mb-2 text-xs font-bold uppercase text-slate-500">Sessions (dates, horaires, prix, ouverture 2027)</p>
                         {editingFormation.sessions.map((s, idx) => (
-                          <div key={s.id} className="mb-2 grid gap-2 rounded border border-slate-200 p-3 sm:grid-cols-5 text-xs">
+                          <div key={s.id} className="mb-2 grid gap-2 rounded border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-5 text-xs">
                             <input type="text" value={s.code} onChange={(e) => { const next = [...editingFormation.sessions]; next[idx].code = e.target.value; setEditingFormation({ ...editingFormation, sessions: next }); }} placeholder="Code" className="rounded border px-2 py-1" />
                             <input type="date" value={s.startDate} onChange={(e) => { const next = [...editingFormation.sessions]; next[idx].startDate = e.target.value; setEditingFormation({ ...editingFormation, sessions: next }); }} className="rounded border px-2 py-1" />
                             <input type="text" value={s.schedule} onChange={(e) => { const next = [...editingFormation.sessions]; next[idx].schedule = e.target.value; setEditingFormation({ ...editingFormation, sessions: next }); }} placeholder="Horaires" className="rounded border px-2 py-1" />
@@ -2938,7 +2945,7 @@ export const AdminPage: React.FC = () => {
 
                   <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
                     {data.formations.map((f) => (
-                      <div key={f.id} className="flex items-center justify-between p-4">
+                      <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                         <div>
                           <p className="font-bold text-slate-900">{f.title}</p>
                           <p className="text-xs text-slate-500">{f.durationHours} h · {f.sessions.filter((s) => s.isOpen).length} session(s) ouverte(s)</p>
@@ -3016,7 +3023,7 @@ export const AdminPage: React.FC = () => {
 
                   <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
                     {data.campaigns.map((c) => (
-                      <div key={c.id} className="flex items-center justify-between p-4">
+                      <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                         <div>
                           <p className="font-bold text-slate-900">{c.title}</p>
                           <p className="text-xs text-slate-500">{c.places} places · Clôture {formatDateFr(c.closeDate)} · {c.criteria.length} critère(s)</p>
@@ -3123,7 +3130,7 @@ export const AdminPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-5">
+              <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
                 <input type="text" placeholder="Libellé de la question" value={newField.label || ''} onChange={(e) => setNewField({ ...newField, label: e.target.value, name: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_') })} className="rounded border border-slate-300 bg-white px-3 py-2 text-xs sm:col-span-2" />
                 <select value={newField.type} onChange={(e) => setNewField({ ...newField, type: e.target.value as any })} className="rounded border border-slate-300 bg-white px-2.5 py-2 text-xs">
                   <option value="text">Texte court</option>

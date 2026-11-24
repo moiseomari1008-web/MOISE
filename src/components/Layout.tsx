@@ -145,7 +145,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   if (isAdminRoute) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="min-h-screen overflow-x-clip bg-slate-50 text-slate-900">
         {(!isOnline || outboxItems.length > 0) && (
           <div className="no-print border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900">
             <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
@@ -175,7 +175,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-white text-slate-900 pb-16 md:pb-0">
+    <div className="flex min-h-screen flex-col overflow-x-clip bg-white text-slate-900 pb-16 md:pb-0">
       {/* Offline / Pending Sync Compact Strip */}
       {(!isOnline || outboxItems.length > 0) && (
         <div className="no-print border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900">
@@ -204,20 +204,20 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Clean 3-Zone Top Bar with signature Red + Yellow top accent */}
       <header className="no-print sticky top-0 z-40 border-b border-[#D90A14]/15 bg-white/95 backdrop-blur-sm">
         <div className="h-1 w-full bg-gradient-to-r from-[#D90A14] via-[#FBBF24] to-[#D90A14]" />
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:h-16 sm:px-6 lg:gap-8">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-4 sm:px-6 lg:gap-8">
           {/* Zone 1: Brand Mark (Official uploaded logo) */}
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus:outline-none"
+            className="flex min-w-0 items-center gap-2 text-left focus:outline-none sm:gap-2.5"
           >
             <img
               src={settings?.logoUrl || '/assets/aistudio/WhatsApp_Image_2026-11-20_at_11.31.55_6695b86a.jpeg'}
               alt="Logo officiel Lomakrev"
-              className="h-9 w-auto rounded-md border border-[#D90A14]/20 object-contain"
+              className="h-8 w-auto shrink-0 rounded-md border border-[#D90A14]/20 object-contain sm:h-9"
               referrerPolicy="no-referrer"
             />
-            <span className="font-display text-lg font-extrabold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
+            <span className="max-w-[140px] truncate font-display text-base font-extrabold tracking-tight text-slate-900 sm:max-w-none sm:text-lg">
               {settings?.siteName || 'Lomakrev'}
             </span>
           </button>
@@ -346,10 +346,20 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Main Content */}
       <main className="flex-1">{children}</main>
 
-      {/* Institutional Footer in Lomakrev Red, Yellow & White */}
-      <footer className="no-print border-t-4 border-[#FBBF24] bg-[#B80811] text-white">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
-          <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+      {/* Institutional Footer in Lomakrev Red, Yellow & White with Professional Backdrop */}
+      <footer className="no-print relative overflow-hidden border-t-4 border-[#FBBF24] bg-[#2C0205] text-white">
+        <img
+          src="/src/assets/images/footer_laptop_studio_1795448543304.jpg"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-85 brightness-100"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#4A0308]/62 via-[#63050B]/52 to-[#3B0307]/62"
+        />
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-10 pb-20 sm:px-6 md:py-12 md:pb-16 lg:py-16">
+          <div className="grid gap-8 sm:gap-10 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-4">
               <div className="flex items-center gap-2.5">
                 <img
@@ -500,7 +510,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Poser une question sur WhatsApp"
-          className="no-print fixed bottom-16 right-4 z-30 inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 shadow-md transition-transform hover:-translate-y-0.5 md:bottom-5"
+          className="no-print fixed bottom-16 right-3 z-30 inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-800 shadow-md transition-transform hover:-translate-y-0.5 sm:right-4 sm:px-4 md:bottom-5"
         >
           <MessageCircle className="h-4 w-4 text-emerald-600" />
           <span className="hidden sm:inline">Poser une question</span>
