@@ -285,13 +285,13 @@ const defaultSettings: SiteSettings = {
     'LOMAKREV GROUP ne collecte que les données strictement nécessaires au traitement de votre demande (commande, inscription académique, candidature aux bourses, devis ou intervention). Les pièces jointes restent privées et ne sont accessibles qu’aux responsables habilités. Durée de conservation : 2 ans pour les candidatures non retenues, durée légale pour les factures et attestations. Vous pouvez demander l’export ou la suppression de vos données à direction@lomakrev.com.',
   autoMessages: {
     CMD_RECEIVED: 'Bonjour {nom}, votre demande de commande {ref} a bien été enregistrée chez Lomakrev Tech. Un conseiller vous rappelle sous 24 h ouvrées.',
-    ACA_RECEIVED: 'Bonjour {nom}, votre inscription {ref} à Lomakrev Académie est enregistrée. Suivez son avancement sur lomakrev.com/suivi.',
-    BRS_RECEIVED: 'Bonjour {nom}, votre candidature {ref} au Programme de Bourses Lomakrev a bien été reçue. Elle est en cours de vérification par notre comité (aucune bourse n’est attribuée automatiquement à l’envoi).',
+    ACA_RECEIVED: 'LOMAKREV ACADÉMIE : inscription {ref} ({formation}, {session}) reçue. Nous vous appelons sous 24 h ouvrées. Suivi : lomakrev.com/suivi',
+    BRS_RECEIVED: 'LOMAKREV : candidature {ref} ({formation}) bien reçue. Suivi : lomakrev.com/suivi. Ce message ne vaut pas attribution de bourse.',
     BRS_APPROVED: 'Félicitations {nom} ! Votre candidature {ref} a été approuvée par le comité Lomakrev Bourses. Notre équipe vous contacte pour la suite.',
     BRS_WAITLIST: 'Bonjour {nom}, votre candidature {ref} est placée en liste d’attente. Nous vous contacterons si une place se libère.',
     BRS_REJECTED: 'Bonjour {nom}, votre candidature {ref} n’a pas été retenue pour cette cohorte. Motif : {motif}.',
-    DEV_RECEIVED: 'Bonjour {nom}, votre demande de devis Top Maintenance {ref} a été reçue. Un ingénieur vous contacte sous 24 h ouvrées.',
-    INT_RECEIVED: 'Bonjour {nom}, votre demande d’intervention Top Maintenance {ref} est enregistrée. Un technicien confirme votre créneau rapidement.',
+    DEV_RECEIVED: 'LOMAKREV TOP MAINTENANCE : demande de devis {ref} ({service}) reçue. Un conseiller vous appelle sous 24 h ouvrées. Suivi : lomakrev.com/suivi',
+    INT_RECEIVED: 'LOMAKREV TOP MAINTENANCE : demande {ref} reçue ({equipement}, {urgence}). Un technicien vous appelle pour fixer le rendez-vous.',
     CTC_RECEIVED: 'Bonjour {nom}, votre message {ref} a bien été transmis à l’équipe LOMAKREV GROUP.',
   },
 };
@@ -1211,6 +1211,36 @@ function restoreHardwareAndBackdropAssetsInDb() {
 
 restoreHardwareAndBackdropAssetsInDb();
 
+function migratePdfAutoMessagesInDb() {
+  const migrationKey = 'migration_pdf_forms_automsg_v1';
+  if (db.prepare('SELECT value FROM kv_store WHERE key = ?').get(migrationKey)) return;
+  const now = new Date().toISOString();
+  const row = db.prepare('SELECT value FROM kv_store WHERE key = ?').get('site_settings') as { value: string } | undefined;
+  if (row) {
+    const parsed = JSON.parse(row.value) as Record<string, any>;
+    const autoMessages = { ...(parsed.autoMessages || {}) };
+    const oldDefaults: Record<string, string> = {
+      ACA_RECEIVED: 'Bonjour {nom}, votre inscription {ref} à Lomakrev Académie est enregistrée. Suivez son avancement sur lomakrev.com/suivi.',
+      BRS_RECEIVED: 'Bonjour {nom}, votre candidature {ref} au Programme de Bourses Lomakrev a bien été reçue. Elle est en cours de vérification par notre comité (aucune bourse n’est attribuée automatiquement à l’envoi).',
+      DEV_RECEIVED: 'Bonjour {nom}, votre demande de devis Top Maintenance {ref} a été reçue. Un ingénieur vous contacte sous 24 h ouvrées.',
+      INT_RECEIVED: 'Bonjour {nom}, votre demande d’intervention Top Maintenance {ref} est enregistrée. Un technicien confirme votre créneau rapidement.',
+    };
+    let changed = false;
+    for (const [k, oldVal] of Object.entries(oldDefaults)) {
+      if (!autoMessages[k] || autoMessages[k] === oldVal) {
+        autoMessages[k] = defaultSettings.autoMessages[k];
+        changed = true;
+      }
+    }
+    if (changed) {
+      parsed.autoMessages = autoMessages;
+      db.prepare('UPDATE kv_store SET value = ?, updated_at = ? WHERE key = ?').run(JSON.stringify(parsed), now, 'site_settings');
+    }
+  }
+  db.prepare('INSERT OR REPLACE INTO kv_store (key, value, updated_at) VALUES (?, ?, ?)').run(migrationKey, 'done', now);
+}
+migratePdfAutoMessagesInDb();
+
 // --- Helper Functions ---
 function getSettings(): SiteSettings {
   const row = db.prepare('SELECT value FROM kv_store WHERE key = ?').get('site_settings') as { value: string } | undefined;
@@ -1395,7 +1425,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '30mb' }));
 
 // Simple rate limiter per key with sliding window and stale-bucket cleanup
 const submissionWindow = new Map<string, number[]>();
@@ -1732,13 +1762,20 @@ app.post('/api/public/drafts', (req, res) => {
     res.status(413).json({ error: 'Brouillon trop volumineux.' });
     return;
   }
+  const cleanKey = String(formKey || 'bourses').slice(0, 32);
   db.prepare('INSERT OR REPLACE INTO drafts (id, form_key, data, updated_at) VALUES (?, ?, ?, ?)').run(
     cleanId,
-    String(formKey || 'bourses').slice(0, 32),
+    cleanKey,
     serialized,
     new Date().toISOString()
   );
-  res.json({ id: cleanId, resumeUrl: `/bourses/postuler?draft=${cleanId}` });
+  const resumeRouteMap: Record<string, string> = {
+    academie: `/academie/inscription?draft=${cleanId}`,
+    devis: `/maintenance/devis?draft=${cleanId}`,
+    intervention: `/maintenance/intervention?draft=${cleanId}`,
+    bourses: `/bourses/postuler?draft=${cleanId}`,
+  };
+  res.json({ id: cleanId, resumeUrl: resumeRouteMap[cleanKey] || `/bourses/postuler?draft=${cleanId}` });
 });
 
 app.get('/api/public/drafts/:id', (req, res) => {
@@ -1778,9 +1815,10 @@ function processSubmission(
   const attachments = Array.isArray(body.attachments) ? body.attachments.slice(0, 5) : [];
 
   // Validate file sizes/types
+  const maxBytes = type === 'INT' ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
   for (const att of attachments) {
-    if (att.size > 10 * 1024 * 1024) {
-      return { status: 400, result: { error: `Le fichier ${att.name} dépasse 10 Mo.` } };
+    if (att.size > maxBytes) {
+      return { status: 400, result: { error: `Le fichier ${att.name} dépasse ${type === 'INT' ? '20' : '10'} Mo.` } };
     }
   }
 
@@ -1874,11 +1912,13 @@ function processSubmission(
 
     // 3. Evaluate configurable criteria
     const p = body.payload || {};
+    const rawSituation = String(p.situation || '');
+    const normalizedSituation = rawSituation === 'Étudiant(e)' ? 'Étudiant' : rawSituation;
     const evalContext: Record<string, string> = {
       age: String(age),
       hasIdCard: attachments.length > 0 ? 'true' : 'false',
       disponibilite: String(p.disponibilite || ''),
-      situation: String(p.situation || ''),
+      situation: normalizedSituation,
       clientLomakrev: String(p.clientLomakrev || ''),
       accesOrdinateur: String(p.accesOrdinateur || ''),
       ville: String(body.ville || p.ville || ''),
@@ -1934,11 +1974,22 @@ function processSubmission(
     type === 'BRS' && eligibilityStatus === 'Non éligible'
       ? 'BRS_REJECTED'
       : `${type === 'WAITLIST' ? 'ACA' : type}_RECEIVED`;
+  const rawPayload = (body.payload || {}) as Record<string, any>;
+  const formationLabel = String(rawPayload.formationChoisie || rawPayload.formationTitle || body.formationSlug || 'formation').trim();
+  const sessionLabel = String(rawPayload.sessionLabel || body.sessionCode || 'session 2027').trim();
+  const serviceLabel = String(rawPayload.serviceLabel || body.serviceKey || 'service IT').trim();
+  const equipementLabel = String(rawPayload.equipement || body.serviceKey || 'équipement').toLowerCase();
+  const urgenceLabel = String(rawPayload.urgence || 'normale').toLowerCase();
   const template = settings.autoMessages[msgKey] || 'Bonjour {nom}, votre demande {ref} a bien été enregistrée.';
   const msgBody = template
-    .replace('{nom}', applicantName)
-    .replace('{ref}', reference)
-    .replace('{motif}', eligibilityReason || '');
+    .replace(/\{nom\}/g, applicantName)
+    .replace(/\{ref\}/g, reference)
+    .replace(/\{motif\}/g, eligibilityReason || '')
+    .replace(/\{formation\}/g, formationLabel)
+    .replace(/\{session\}/g, sessionLabel)
+    .replace(/\{service\}/g, serviceLabel)
+    .replace(/\{equipement\}/g, equipementLabel)
+    .replace(/\{urgence\}/g, urgenceLabel);
 
   const notifications: Dossier['notifications'] = [
     {
@@ -2078,6 +2129,7 @@ function processSubmission(
         applicantName: dossier.applicantName,
         eligibilityStatus: dossier.eligibilityStatus,
         eligibilityReason: dossier.eligibilityReason,
+        autoMessage: notifications[0]?.body || '',
         createdAt: dossier.createdAt,
         notifications: dossier.notifications,
       },

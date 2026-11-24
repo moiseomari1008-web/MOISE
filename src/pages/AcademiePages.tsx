@@ -10,8 +10,18 @@ import {
   SubmissionSuccessCard,
   validateRdcPhone,
 } from '../components/DynamicFormFields';
+import {
+  PdfCheckboxGroup,
+  PdfField,
+  PdfFormActions,
+  PdfFormShell,
+  PdfRadioGroup,
+  PdfStepCard,
+  PdfSummarySection,
+} from '../components/PdfFormKit';
 import { formatDateFr } from '../lib/pdfPrint';
-import { loadFormDraft, saveFormDraft, clearFormDraft } from '../lib/offlineSync';
+import { clearFormDraft, loadFormDraft, saveFormDraft } from '../lib/offlineSync';
+import { KINSHASA_COMMUNES } from '../lib/rdcGeo';
 import { OfficeAwareSelect } from '../components/DualSelectInput';
 
 export const AcademieHomePage: React.FC = () => {
@@ -116,6 +126,8 @@ export const FormationDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
   const [wlResult, setWlResult] = useState<any>(null);
   const [wlBusy, setWlBusy] = useState(false);
 
+  const [wlSelectedFormations, setWlSelectedFormations] = useState<string[]>([]);
+
   if (!data) return null;
   const formation = data.formations.find((f) => f.slug === slug);
 
@@ -131,29 +143,34 @@ export const FormationDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
   }
 
   const openSessions = formation.sessions.filter((s) => s.isOpen);
+  const activeWlFormations = wlSelectedFormations.length > 0 ? wlSelectedFormations : [formation.title];
 
   const handleWaitlist = async (e: React.FormEvent) => {
     e.preventDefault();
     setWlError('');
     if (!wlName.trim()) {
-      setWlError('Veuillez saisir votre nom.');
+      setWlError('Veuillez saisir votre nom complet.');
       return;
     }
     if (!validateRdcPhone(wlPhone)) {
       setWlError('Numéro RDC invalide (+243 suivi de 9 chiffres).');
       return;
     }
+    if (activeWlFormations.length === 0) {
+      setWlError('Veuillez sélectionner au moins une formation.');
+      return;
+    }
     if (!wlConsent) {
-      setWlError('Veuillez accepter d’être recontacté lors de l’ouverture.');
+      setWlError('Veuillez accepter d’être contacté(e) à l’ouverture des inscriptions.');
       return;
     }
     setWlBusy(true);
-    const res = await submitForm('WAITLIST', `Liste intérêt ${formation.title}`, {
+    const res = await submitForm('WAITLIST', `Liste intérêt ${activeWlFormations.join(', ')}`, {
       applicantName: wlName.trim(),
       phone: wlPhone,
       email: wlEmail.trim(),
       formationSlug: formation.slug,
-      payload: { formationTitle: formation.title },
+      payload: { formationTitle: activeWlFormations.join(', '), formations: activeWlFormations },
     });
     setWlBusy(false);
     if (!res.ok) {
@@ -269,24 +286,28 @@ export const FormationDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
 
                 {waitlistOpen && !wlResult && (
                   <form onSubmit={handleWaitlist} className="space-y-3 border-t border-slate-200 pt-4">
-                    <input
-                      type="text"
-                      value={wlName}
-                      onChange={(e) => setWlName(e.target.value)}
-                      placeholder="Votre nom complet *"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    />
-                    <RdcPhoneInput phone={wlPhone} onPhoneChange={setWlPhone} showWhatsappOption={false} />
-                    <input
-                      type="email"
-                      value={wlEmail}
-                      onChange={(e) => setWlEmail(e.target.value)}
-                      placeholder="E-mail (facultatif)"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    />
-                    <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-600">
-                      <input type="checkbox" checked={wlConsent} onChange={(e) => setWlConsent(e.target.checked)} className="mt-0.5 accent-[#D90A14]" />
-                      <span>J’accepte d’être averti par SMS/WhatsApp ou e-mail lors de l’ouverture des inscriptions 2027.</span>
+                    <PdfField label="Nom complet" required>
+                      <input
+                        type="text"
+                        value={wlName}
+                        onChange={(e) => setWlName(e.target.value)}
+                        placeholder="Ex. : Grâce Mbuyi"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      />
+                    </PdfField>
+                    <RdcPhoneInput label="Téléphone / WhatsApp" phone={wlPhone} onPhoneChange={setWlPhone} showWhatsappOption={false} />
+                    <PdfField label="Formation(s) qui vous intéressent" required>
+                      <PdfCheckboxGroup
+                        values={activeWlFormations}
+                        onChange={setWlSelectedFormations}
+                        options={data.formations.filter((f) => f.active).map((f) => f.title)}
+                        tone="academie"
+                        columnsClass="flex flex-col gap-1.5"
+                      />
+                    </PdfField>
+                    <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                      <input type="checkbox" checked={wlConsent} onChange={(e) => setWlConsent(e.target.checked)} className="mt-0.5 accent-[#1E293B]" />
+                      <span>J'accepte d'être contacté(e) à l'ouverture des inscriptions. <span className="text-[#D90A14]">*</span></span>
                     </label>
                     {wlError && <p className="text-xs font-medium text-[#D90A14]">{wlError}</p>}
                     <button
@@ -294,7 +315,7 @@ export const FormationDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
                       disabled={wlBusy}
                       className="w-full rounded-lg bg-[#D90A14] py-2.5 text-sm font-semibold text-white hover:bg-[#B80811]"
                     >
-                      {wlBusy ? 'Enregistrement...' : 'Valider mon intérêt'}
+                      {wlBusy ? 'Enregistrement...' : 'Me prévenir de l’ouverture'}
                     </button>
                   </form>
                 )}
@@ -304,7 +325,11 @@ export const FormationDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
                     offline={wlResult.offline}
                     localId={wlResult.localId}
                     dossier={wlResult.dossier}
-                    nextStepsText="Vous êtes inscrit sur la liste d’intérêt 2027. Notre équipe vous contactera dès l’ouverture de la session."
+                    title="Demande enregistrée"
+                    bulletPoints={[
+                      'Vous êtes inscrit(e) sur la liste d’alerte pour la relance 2027.',
+                      'Nous vous contacterons par téléphone ou WhatsApp dès l’ouverture des inscriptions.',
+                    ]}
                     onReset={() => {
                       setWlResult(null);
                       setWaitlistOpen(false);
@@ -328,47 +353,76 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
   enteredByAgent = null,
   onDone,
 }) => {
-  const { data, searchQuery, submitForm, navigate } = useApp();
+  const { data, searchQuery, submitForm, navigate, pushToast } = useApp();
   const params = new URLSearchParams(searchQuery);
   const initialFormation = params.get('formation') || '';
   const initialSession = params.get('session') || '';
+  const draftParam = params.get('draft') || '';
 
-  const [step, setStep] = useState(1);
+  const [activeStepKey, setActiveStepKey] = useState<'1' | '2' | '2b' | '3' | '4'>('1');
+  const [resumeLink, setResumeLink] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formState, setFormState] = useState<Record<string, any>>({
     formationSlug: initialFormation || 'cybersecurite',
-    sessionCode: initialSession || '2027-01',
-    format: 'Présentiel',
-    typeInscription: 'Individuelle',
+    sessionCode: initialSession || '',
+    format: 'Présentiel (Gombe)',
+    typeInscription: 'Pour moi-même',
     nom: '',
     postnom: '',
     prenom: '',
-    sexe: 'Masculin',
+    sexe: '',
     dateNaissance: '',
     phone: '+243',
     whatsapp: '+243',
     sameWhatsapp: true,
     email: '',
-    commune: '',
     ville: 'Kinshasa',
+    commune: '',
+    communeAutre: '',
+    // Step 2b Organisation
     organisation: '',
-    nbParticipants: '2',
+    secteurActivite: '',
+    nbParticipants: '',
     personneContact: '',
-    besoinFacture: 'Oui',
-    niveauEtudes: 'Graduat / Licence',
-    situation: 'Étudiant',
-    niveauInfo: 'Débutant',
-    portable: 'Oui',
-    source: 'WhatsApp',
+    factureOrganisation: '',
+    // Step 3 Profil
+    niveauEtudes: '',
+    situation: '',
+    niveauInfo: '',
+    portable: '',
     attentes: '',
+    source: '',
+    // Step 4 Envoi
+    modePaiement: '',
+    acceptReglement: false,
     consent: false,
+    consentMessages: false,
     _website: '',
   });
-  const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<any>(null);
 
+  // Short waitlist version state (when no open sessions exist)
+  const [wlName, setWlName] = useState('');
+  const [wlPhone, setWlPhone] = useState('+243');
+  const [wlFormations, setWlFormations] = useState<string[]>([]);
+  const [wlConsent, setWlConsent] = useState(false);
+  const [wlErrors, setWlErrors] = useState<Record<string, string>>({});
+  const [wlBusy, setWlBusy] = useState(false);
+  const [wlResult, setWlResult] = useState<any>(null);
+
   useEffect(() => {
-    if (!enteredByAgent) {
+    if (draftParam) {
+      fetch(`/api/public/drafts/${encodeURIComponent(draftParam)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d?.data) {
+            setFormState((prev) => ({ ...prev, ...d.data }));
+            pushToast('info', 'Brouillon restauré avec succès.');
+          }
+        })
+        .catch(() => {});
+    } else if (!enteredByAgent) {
       loadFormDraft('academie').then((saved) => {
         if (saved) {
           setFormState((prev) => ({
@@ -380,9 +434,15 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
         }
       });
     }
-  }, [enteredByAgent, initialFormation, initialSession]);
+  }, [draftParam, enteredByAgent, initialFormation, initialSession, pushToast]);
 
   const updateField = (k: string, v: any) => {
+    setFieldErrors((prev) => {
+      if (!prev[k]) return prev;
+      const c = { ...prev };
+      delete c[k];
+      return c;
+    });
     setFormState((prev) => {
       const next = { ...prev, [k]: v };
       if (!enteredByAgent) saveFormDraft('academie', next);
@@ -391,32 +451,271 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
   };
 
   if (!data) return null;
-  const formations = data.formations;
-  const selectedFormation = formations.find((f) => f.slug === formState.formationSlug) || formations[0];
+  const activeFormations = data.formations.filter((f) => f.active);
+  const anyOpenSessions = activeFormations.some((f) => f.sessions.some((s) => s.isOpen));
+  const selectedFormation = activeFormations.find((f) => f.slug === formState.formationSlug) || activeFormations[0];
+  const openSessions = (selectedFormation?.sessions || []).filter((s) => s.isOpen);
+  const currentSession = openSessions.find((s) => s.code === formState.sessionCode) || openSessions[0];
   const customFields = data.forms.academie?.customFields || [];
+  const isOrg = formState.typeInscription === 'Pour mon entreprise ou mon organisation';
+  const resolvedCommune = formState.commune === 'Autre' ? formState.communeAutre : formState.commune;
 
-  const nextStep = () => {
-    setError('');
-    if (step === 2) {
-      if (!formState.nom.trim() || !formState.prenom.trim()) {
-        setError('Veuillez renseigner votre nom et prénom.');
-        return;
-      }
-      if (!validateRdcPhone(formState.phone)) {
-        setError('Numéro de téléphone RDC invalide (+243 suivi de 9 chiffres).');
-        return;
+  const stepsList = isOrg
+    ? [
+        { key: '1', num: '1', label: 'Formation' },
+        { key: '2', num: '2', label: 'Participant' },
+        { key: '2b', num: '2b', label: 'Organisation' },
+        { key: '3', num: '3', label: 'Profil' },
+        { key: '4', num: '4', label: 'Envoi' },
+      ]
+    : [
+        { key: '1', num: '1', label: 'Formation' },
+        { key: '2', num: '2', label: 'Participant' },
+        { key: '3', num: '3', label: 'Profil' },
+        { key: '4', num: '4', label: 'Envoi' },
+      ];
+  const activeStepIndex = Math.max(0, stepsList.findIndex((s) => s.key === activeStepKey));
+
+  const handleSaveDraft = async () => {
+    await saveFormDraft('academie', formState);
+    if (navigator.onLine) {
+      try {
+        const res = await fetch('/api/public/drafts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: draftParam || undefined, formKey: 'academie', data: formState }),
+        });
+        const json = await res.json();
+        if (json.resumeUrl) {
+          setResumeLink(`${window.location.origin}${json.resumeUrl}`);
+          pushToast('success', 'Brouillon enregistré. Lien de reprise prêt.');
+          return;
+        }
+      } catch {
+        // fallback local only
       }
     }
-    setStep((s) => Math.min(4, s + 1));
+    pushToast('success', 'Brouillon sauvegardé sur cet appareil.');
+  };
+
+  // Version courte : « Me prévenir de l'ouverture » when NO open session exists across Académie (or selected formation via ?formation has none and user didn't pick another)
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs: Record<string, string> = {};
+    if (!wlName.trim()) errs.wlName = 'Veuillez indiquer votre nom complet.';
+    if (!validateRdcPhone(wlPhone)) errs.wlPhone = 'Format requis : +243 suivi de 9 chiffres.';
+    if (wlFormations.length === 0) errs.wlFormations = 'Veuillez choisir au moins une formation.';
+    if (!wlConsent) errs.wlConsent = 'Veuillez cocher cette autorisation.';
+    if (Object.keys(errs).length > 0) {
+      setWlErrors(errs);
+      return;
+    }
+    setWlBusy(true);
+    const res = await submitForm('WAITLIST', `Liste intérêt ${wlFormations.join(', ')}`, {
+      applicantName: wlName.trim(),
+      phone: wlPhone,
+      formationSlug: selectedFormation?.slug || activeFormations[0]?.slug,
+      payload: { formationTitle: wlFormations.join(', '), formations: wlFormations },
+    });
+    setWlBusy(false);
+    if (!res.ok) {
+      setWlErrors({ submit: res.error || 'Erreur lors de l’envoi.' });
+      return;
+    }
+    setWlResult(res);
+  };
+
+  if (!anyOpenSessions && !enteredByAgent) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10">
+        <Breadcrumbs items={[{ label: 'Lomakrev Académie', to: '/academie' }, { label: 'Me prévenir de l’ouverture' }]} />
+        {wlResult ? (
+          <SubmissionSuccessCard
+            offline={wlResult.offline}
+            localId={wlResult.localId}
+            dossier={wlResult.dossier}
+            title="Inscription en liste d'attente enregistrée"
+            bulletPoints={[
+              'Vous serez prévenu(e) par téléphone ou WhatsApp dès l’ouverture des inscriptions.',
+              'Suivez votre demande sur lomakrev.com/suivi.',
+            ]}
+            onReset={() => {
+              setWlResult(null);
+              navigate('/academie');
+            }}
+          />
+        ) : (
+          <PdfFormShell
+            tone="academie"
+            poleLabel="LOMAKREV ACADÉMIE"
+            title="Me prévenir de l'ouverture"
+            urlHint="lomakrev.com/academie/inscription"
+            refPreview="WL-AAAA-00000"
+            introText="Aucune session n'est ouverte pour le moment (relance 2027). Laissez vos coordonnées pour être averti(e) en priorité dès l'ouverture des inscriptions."
+            steps={[{ key: 'wl', num: '+', label: 'Liste d’alerte' }]}
+            activeStepIndex={0}
+          >
+            <form onSubmit={handleWaitlistSubmit} className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <PdfField label="Nom complet" required error={wlErrors.wlName}>
+                  <input
+                    type="text"
+                    placeholder="Ex. : Grâce Mbuyi"
+                    value={wlName}
+                    onChange={(e) => {
+                      setWlName(e.target.value);
+                      setWlErrors((p) => ({ ...p, wlName: '' }));
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm sm:text-base outline-none focus:border-[#1E293B]"
+                  />
+                </PdfField>
+
+                <RdcPhoneInput
+                  label="Téléphone / WhatsApp"
+                  phone={wlPhone}
+                  onPhoneChange={(v) => {
+                    setWlPhone(v);
+                    setWlErrors((p) => ({ ...p, wlPhone: '' }));
+                  }}
+                  showWhatsappOption={false}
+                  error={wlErrors.wlPhone}
+                />
+              </div>
+
+              <PdfField label="Formation(s) qui vous intéressent" required error={wlErrors.wlFormations}>
+                <PdfCheckboxGroup
+                  values={wlFormations}
+                  onChange={(next) => {
+                    setWlFormations(next);
+                    setWlErrors((p) => ({ ...p, wlFormations: '' }));
+                  }}
+                  options={activeFormations.map((f) => f.title)}
+                  tone="academie"
+                />
+              </PdfField>
+
+              <div>
+                <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={wlConsent}
+                    onChange={(e) => {
+                      setWlConsent(e.target.checked);
+                      setWlErrors((p) => ({ ...p, wlConsent: '' }));
+                    }}
+                    className="mt-0.5 h-4 w-4 accent-[#1E293B]"
+                  />
+                  <span>
+                    J'accepte d'être contacté(e) à l'ouverture des inscriptions. <span className="text-[#D90A14]">*</span>
+                  </span>
+                </label>
+                {wlErrors.wlConsent && <p className="mt-1 pl-6 text-xs font-medium text-[#D90A14]">{wlErrors.wlConsent}</p>}
+              </div>
+
+              {wlErrors.submit && <p className="text-sm font-medium text-[#D90A14]">{wlErrors.submit}</p>}
+
+              <div className="flex justify-end border-t border-slate-100 pt-4">
+                <button
+                  type="submit"
+                  disabled={wlBusy}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#D90A14] px-5 text-sm font-semibold text-white hover:bg-[#b80811] disabled:opacity-60"
+                >
+                  {wlBusy ? 'Enregistrement...' : 'Me prévenir de l’ouverture'}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+          </PdfFormShell>
+        )}
+      </div>
+    );
+  }
+
+  const validateAndNext = () => {
+    const errs: Record<string, string> = {};
+    if (activeStepKey === '1') {
+      if (!selectedFormation) errs.formationSlug = 'Veuillez choisir une formation.';
+      if (openSessions.length === 0 && !enteredByAgent) {
+        errs.sessionCode = 'Aucune session ouverte pour cette formation. Choisissez une formation ayant une session ouverte.';
+      }
+      if (!formState.format) errs.format = 'Veuillez choisir un format.';
+      if (!formState.typeInscription) errs.typeInscription = 'Veuillez choisir un type d’inscription.';
+      if (Object.keys(errs).length > 0) {
+        setFieldErrors(errs);
+        return;
+      }
+      setActiveStepKey('2');
+      return;
+    }
+
+    if (activeStepKey === '2') {
+      if (!formState.nom.trim()) errs.nom = 'Veuillez indiquer votre nom.';
+      if (!formState.postnom.trim()) errs.postnom = 'Veuillez indiquer votre postnom.';
+      if (!formState.prenom.trim()) errs.prenom = 'Veuillez indiquer votre prénom.';
+      if (!formState.sexe) errs.sexe = 'Veuillez sélectionner votre sexe.';
+      if (!formState.dateNaissance) errs.dateNaissance = 'Veuillez indiquer votre date de naissance.';
+      if (!validateRdcPhone(formState.phone)) errs.phone = 'Format requis : +243 suivi de 9 chiffres.';
+      if (!formState.sameWhatsapp && formState.whatsapp && formState.whatsapp !== '+243' && !validateRdcPhone(formState.whatsapp)) {
+        errs.whatsapp = 'Format WhatsApp requis : +243 suivi de 9 chiffres.';
+      }
+      if (!formState.ville.trim()) errs.ville = 'Veuillez indiquer votre ville.';
+      if (!resolvedCommune.trim()) errs.commune = 'Veuillez choisir ou saisir votre commune.';
+      if (Object.keys(errs).length > 0) {
+        setFieldErrors(errs);
+        return;
+      }
+      setActiveStepKey(isOrg ? '2b' : '3');
+      return;
+    }
+
+    if (activeStepKey === '2b') {
+      if (!formState.organisation.trim()) errs.organisation = 'Veuillez indiquer le nom de l’organisation.';
+      if (!String(formState.nbParticipants).trim() || Number(formState.nbParticipants) <= 0) {
+        errs.nbParticipants = 'Veuillez indiquer le nombre de participants.';
+      }
+      if (!formState.personneContact.trim()) errs.personneContact = 'Veuillez indiquer la personne de contact et sa fonction.';
+      if (Object.keys(errs).length > 0) {
+        setFieldErrors(errs);
+        return;
+      }
+      setActiveStepKey('3');
+      return;
+    }
+
+    if (activeStepKey === '3') {
+      if (!formState.niveauEtudes) errs.niveauEtudes = 'Veuillez choisir votre niveau d’études.';
+      if (!formState.situation) errs.situation = 'Veuillez indiquer votre situation actuelle.';
+      if (!formState.niveauInfo) errs.niveauInfo = 'Veuillez sélectionner votre niveau dans ce domaine.';
+      if (!formState.portable) errs.portable = 'Veuillez répondre à cette question.';
+      if (Object.keys(errs).length > 0) {
+        setFieldErrors(errs);
+        return;
+      }
+      setActiveStepKey('4');
+    }
+  };
+
+  const handleBack = () => {
+    if (activeStepKey === '4') setActiveStepKey('3');
+    else if (activeStepKey === '3') setActiveStepKey(isOrg ? '2b' : '2');
+    else if (activeStepKey === '2b') setActiveStepKey('2');
+    else if (activeStepKey === '2') setActiveStepKey('1');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    if (!formState.consent) {
-      setError('Veuillez accepter le règlement et la politique de confidentialité.');
+    const errs: Record<string, string> = {};
+    if (!formState.modePaiement) errs.modePaiement = 'Veuillez sélectionner un mode de paiement envisagé.';
+    if (!formState.acceptReglement) errs.acceptReglement = 'Veuillez accepter le règlement de la Lomakrev Académie.';
+    if (!formState.consent) errs.consent = 'Veuillez accepter le traitement de vos données.';
+    if (!formState.consentMessages) errs.consentMessages = 'Veuillez accepter de recevoir les messages de suivi.';
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
+
+    const sessionCode = currentSession?.code || formState.sessionCode || '2027-01';
+    const sessionLabel = currentSession ? formatDateFr(currentSession.startDate) : sessionCode;
     setSubmitting(true);
     const res = await submitForm(
       'ACA',
@@ -426,26 +725,36 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
         phone: formState.phone,
         whatsapp: formState.sameWhatsapp ? formState.phone : formState.whatsapp,
         email: formState.email,
-        commune: formState.commune,
+        commune: resolvedCommune,
         ville: formState.ville,
-        formationSlug: formState.formationSlug,
-        sessionCode: formState.sessionCode,
+        formationSlug: selectedFormation?.slug || formState.formationSlug,
+        sessionCode,
         _website: formState._website,
-        payload: formState,
+        payload: {
+          ...formState,
+          commune: resolvedCommune,
+          formationChoisie: selectedFormation?.title || formState.formationSlug,
+          sessionLabel,
+        },
       },
       enteredByAgent
     );
     setSubmitting(false);
     if (!res.ok) {
-      setError(res.error || 'Erreur lors de l’envoi.');
+      setFieldErrors({ submit: res.error || 'Erreur lors de l’envoi.' });
       return;
     }
     if (!enteredByAgent) clearFormDraft('academie');
     setResult(res);
   };
 
+  const inputClass = (hasErr?: boolean) =>
+    `w-full rounded-lg border px-3.5 py-2.5 text-sm sm:text-base outline-none transition-colors ${
+      hasErr ? 'border-[#D90A14] bg-red-50/30' : 'border-slate-300 bg-white focus:border-[#1E293B]'
+    }`;
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:py-12">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10">
       {!enteredByAgent && (
         <Breadcrumbs items={[{ label: 'Lomakrev Académie', to: '/academie' }, { label: 'Inscription en ligne' }]} />
       )}
@@ -455,6 +764,16 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
           offline={result.offline}
           localId={result.localId}
           dossier={result.dossier}
+          title="Inscription bien reçue"
+          bulletPoints={[
+            'Notre équipe vous contacte sous 24 h ouvrées pour confirmer votre place.',
+            'Vous recevrez les modalités de paiement et le lieu exact.',
+            'Suivez votre inscription sur lomakrev.com/suivi.',
+          ]}
+          smsPreview={
+            result.dossier?.autoMessage ||
+            `LOMAKREV ACADÉMIE : inscription ${result.dossier?.reference} (${selectedFormation?.title}, ${currentSession ? formatDateFr(currentSession.startDate) : formState.sessionCode}) reçue. Nous vous appelons sous 24 h ouvrées. Suivi : lomakrev.com/suivi`
+          }
           onReset={() => {
             setResult(null);
             if (onDone) onDone();
@@ -462,260 +781,488 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
           }}
         />
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
-          <div className="mb-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-[#D90A14]">
-              {enteredByAgent ? `Saisie au bureau (${enteredByAgent})` : 'Lomakrev Académie · Formulaire d’inscription'}
-            </p>
-            <h1 className="mt-1 font-display text-2xl font-extrabold text-slate-900">Inscription à une formation</h1>
-            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-[#FEF3C7]">
-              <div className="h-full bg-[#D90A14] transition-all" style={{ width: `${(step / 4) * 100}%` }} />
-            </div>
-            <p className="mt-2 text-xs font-medium text-slate-500">Étape {step} sur 4</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <PdfFormShell
+          tone="academie"
+          poleLabel="LOMAKREV ACADÉMIE"
+          title="Inscription à une formation"
+          urlHint="lomakrev.com/academie/inscription?formation=…&session=…"
+          refPreview="ACA-AAAA-00000"
+          introText="Inscrivez-vous en 4 étapes (environ 5 minutes). Votre place est confirmée par notre équipe après vérification et paiement."
+          steps={stepsList}
+          activeStepIndex={activeStepIndex}
+          onStepClick={(idx) => setActiveStepKey(stepsList[idx].key as any)}
+          enteredByAgent={enteredByAgent}
+          resumeLink={resumeLink}
+        >
+          <form onSubmit={handleSubmit} className="space-y-4">
             <input type="text" value={formState._website} onChange={(e) => updateField('_website', e.target.value)} className="hidden" tabIndex={-1} autoComplete="off" />
 
-            {step === 1 && (
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Formation choisie *</label>
+            {activeStepKey === '1' && (
+              <PdfStepCard tone="academie" stepNum="1" title="Choix de la formation" stepMeta="Étape 1 sur 4">
+                <PdfField
+                  label="Formation"
+                  required
+                  helper="Préremplie par le lien partagé ; modifiable."
+                  error={fieldErrors.formationSlug}
+                >
                   <OfficeAwareSelect
                     officeMode={Boolean(enteredByAgent)}
                     fieldKey="office_academie_formation"
-                    value={formState.formationSlug}
-                    onChange={(val) => updateField('formationSlug', val)}
-                    options={formations.map((f) => ({ value: f.slug, label: `${f.title} (${f.durationHours} h)` }))}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
+                    value={selectedFormation?.slug || formState.formationSlug}
+                    onChange={(val) => {
+                      updateField('formationSlug', val);
+                      const f = activeFormations.find((x) => x.slug === val);
+                      const firstOpen = f?.sessions.find((s) => s.isOpen);
+                      updateField('sessionCode', firstOpen?.code || '');
+                    }}
+                    options={activeFormations.map((f) => {
+                      const countOpen = f.sessions.filter((s) => s.isOpen).length;
+                      return {
+                        value: f.slug,
+                        label: countOpen > 0 ? f.title : `${f.title} (bientôt disponible)`,
+                      };
+                    })}
+                    className={inputClass(Boolean(fieldErrors.formationSlug))}
                   />
+                </PdfField>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <PdfField
+                    label="Session"
+                    required
+                    helper="Seules les sessions ouvertes sont proposées, avec les places restantes."
+                    error={fieldErrors.sessionCode}
+                  >
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_academie_session"
+                      value={currentSession?.code || formState.sessionCode}
+                      onChange={(val) => updateField('sessionCode', val)}
+                      options={
+                        openSessions.length > 0
+                          ? openSessions.map((s) => ({
+                              value: s.code,
+                              label: `Session du ${formatDateFr(s.startDate)} — ${Math.max(0, s.capacity - s.enrolledCount)} places restantes`,
+                            }))
+                          : enteredByAgent
+                          ? [{ value: '2027-01', label: 'Relance 2027 — Saisie bureau' }]
+                          : [{ value: '', label: 'Aucune session ouverte pour cette formation' }]
+                      }
+                      className={inputClass(Boolean(fieldErrors.sessionCode))}
+                    />
+                  </PdfField>
+
+                  <PdfField label="Format" required error={fieldErrors.format}>
+                    <PdfRadioGroup
+                      name="aca_format"
+                      value={formState.format}
+                      onChange={(val) => updateField('format', val)}
+                      options={['Présentiel (Gombe)', 'En ligne']}
+                      tone="academie"
+                    />
+                  </PdfField>
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Session *</label>
-                  <OfficeAwareSelect
-                    officeMode={Boolean(enteredByAgent)}
-                    fieldKey="office_academie_session"
-                    value={formState.sessionCode}
-                    onChange={(val) => updateField('sessionCode', val)}
-                    options={
-                      selectedFormation?.sessions.length
-                        ? selectedFormation.sessions.map((s) => ({
-                            value: s.code,
-                            label: `${s.code} — ${formatDateFr(s.startDate)} (${s.schedule})`,
-                          }))
-                        : [{ value: '2027-01', label: 'Relance 2027 — Pré-inscription' }]
-                    }
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
+                <PdfField label="Vous inscrivez-vous…" required error={fieldErrors.typeInscription}>
+                  <PdfRadioGroup
+                    name="aca_type_inscription"
+                    value={formState.typeInscription}
+                    onChange={(val) => updateField('typeInscription', val)}
+                    options={['Pour moi-même', 'Pour mon entreprise ou mon organisation']}
+                    tone="academie"
                   />
+                </PdfField>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs sm:text-sm text-slate-600">
+                  Durée : <strong className="text-slate-900">{selectedFormation?.durationHours} h</strong> · Prix :{' '}
+                  <strong className="text-slate-900">
+                    {currentSession?.priceUsd ? `${currentSession.priceUsd} USD` : "affiché dès qu'il est saisi dans l'administration"}
+                  </strong>{' '}
+                  · Attestation Lomakrev Académie
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Format souhaité *</label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {['Présentiel', 'En ligne'].map((fmt) => (
-                      <button
-                        key={fmt}
-                        type="button"
-                        onClick={() => updateField('format', fmt)}
-                        className={`rounded-lg border py-3 text-sm font-semibold transition-colors ${
-                          formState.format === fmt ? 'border-[#D90A14] bg-[#D90A14] text-white' : 'border-slate-300 text-slate-700 hover:bg-[#FFFBEB]'
-                        }`}
-                      >
-                        {fmt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Type d’inscription *</label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {['Individuelle', 'Entreprise / Organisation'].map((tp) => (
-                      <button
-                        key={tp}
-                        type="button"
-                        onClick={() => updateField('typeInscription', tp)}
-                        className={`rounded-lg border py-3 text-sm font-semibold transition-colors ${
-                          formState.typeInscription === tp ? 'border-[#D90A14] bg-[#D90A14] text-white' : 'border-slate-300 text-slate-700 hover:bg-[#FFFBEB]'
-                        }`}
-                      >
-                        {tp}
-                      </button>
-                    ))}
-                  </div>
-                </div>
                 <CustomFieldsRenderer fields={customFields} step={1} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
-              </div>
+              </PdfStepCard>
             )}
 
-            {step === 2 && (
-              <div className="space-y-4">
+            {activeStepKey === '2' && (
+              <PdfStepCard tone="academie" stepNum="2" title="Participant" stepMeta="Étape 2 sur 4">
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Nom *</label>
-                    <input type="text" value={formState.nom} onChange={(e) => updateField('nom', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Postnom</label>
-                    <input type="text" value={formState.postnom} onChange={(e) => updateField('postnom', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Prénom *</label>
-                    <input type="text" value={formState.prenom} onChange={(e) => updateField('prenom', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  </div>
+                  <PdfField label="Nom" required error={fieldErrors.nom}>
+                    <input type="text" placeholder="Ex. : MBUYI" value={formState.nom} onChange={(e) => updateField('nom', e.target.value)} className={inputClass(Boolean(fieldErrors.nom))} />
+                  </PdfField>
+                  <PdfField label="Postnom" required error={fieldErrors.postnom}>
+                    <input type="text" placeholder="Ex. : KABANGA" value={formState.postnom} onChange={(e) => updateField('postnom', e.target.value)} className={inputClass(Boolean(fieldErrors.postnom))} />
+                  </PdfField>
+                  <PdfField label="Prénom" required error={fieldErrors.prenom}>
+                    <input type="text" placeholder="Ex. : Grâce" value={formState.prenom} onChange={(e) => updateField('prenom', e.target.value)} className={inputClass(Boolean(fieldErrors.prenom))} />
+                  </PdfField>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Sexe *</label>
-                    <OfficeAwareSelect
-                      officeMode={Boolean(enteredByAgent)}
-                      fieldKey="office_sexe"
+                  <PdfField label="Sexe" required error={fieldErrors.sexe}>
+                    <PdfRadioGroup
+                      name="aca_sexe"
                       value={formState.sexe}
                       onChange={(val) => updateField('sexe', val)}
-                      options={['Masculin', 'Féminin']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      options={['Femme', 'Homme']}
+                      tone="academie"
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Date de naissance *</label>
-                    <input type="date" value={formState.dateNaissance} onChange={(e) => updateField('dateNaissance', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  </div>
+                  </PdfField>
+                  <PdfField label="Date de naissance" required error={fieldErrors.dateNaissance}>
+                    <input type="date" value={formState.dateNaissance} onChange={(e) => updateField('dateNaissance', e.target.value)} className={inputClass(Boolean(fieldErrors.dateNaissance))} />
+                  </PdfField>
                 </div>
 
                 <RdcPhoneInput
+                  label="Téléphone"
+                  whatsappLabel="Numéro WhatsApp"
                   phone={formState.phone}
                   onPhoneChange={(v) => updateField('phone', v)}
                   whatsapp={formState.whatsapp}
                   onWhatsappChange={(v) => updateField('whatsapp', v)}
                   sameForWhatsapp={formState.sameWhatsapp}
                   onSameChange={(v) => updateField('sameWhatsapp', v)}
+                  error={fieldErrors.phone}
+                  whatsappError={fieldErrors.whatsapp}
+                  layout="grid"
                 />
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">E-mail (facultatif)</label>
-                    <input type="email" value={formState.email} onChange={(e) => updateField('email', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Commune *</label>
-                    <input type="text" value={formState.commune} onChange={(e) => updateField('commune', e.target.value)} placeholder="Ex. Gombe" className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Ville *</label>
-                    <input type="text" value={formState.ville} onChange={(e) => updateField('ville', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  </div>
+                <PdfField label="Adresse e-mail" helper="Facultatif, mais recommandé pour recevoir les documents.">
+                  <input type="email" placeholder="exemple@gmail.com" value={formState.email} onChange={(e) => updateField('email', e.target.value)} className={inputClass(false)} />
+                </PdfField>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <PdfField label="Ville" required error={fieldErrors.ville}>
+                    <input type="text" placeholder="Ex. : Kinshasa" value={formState.ville} onChange={(e) => updateField('ville', e.target.value)} className={inputClass(Boolean(fieldErrors.ville))} />
+                  </PdfField>
+
+                  <PdfField label="Commune" required error={fieldErrors.commune}>
+                    <div className="space-y-2">
+                      <OfficeAwareSelect
+                        officeMode={Boolean(enteredByAgent)}
+                        fieldKey="office_kin_commune"
+                        value={formState.commune}
+                        onChange={(val) => updateField('commune', val)}
+                        options={[
+                          ...(!enteredByAgent ? [{ value: '', label: 'Choisir…' }] : []),
+                          ...KINSHASA_COMMUNES.map((c) => ({ value: c, label: c })),
+                          { value: 'Autre', label: 'Autre commune' },
+                        ]}
+                        className={inputClass(Boolean(fieldErrors.commune))}
+                      />
+                      {formState.commune === 'Autre' && (
+                        <input
+                          type="text"
+                          placeholder="Précisez la commune"
+                          value={formState.communeAutre}
+                          onChange={(e) => updateField('communeAutre', e.target.value)}
+                          className={inputClass(Boolean(fieldErrors.commune))}
+                        />
+                      )}
+                    </div>
+                  </PdfField>
                 </div>
 
-                {formState.typeInscription === 'Entreprise / Organisation' && (
-                  <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Informations entreprise</p>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <input type="text" placeholder="Nom de l’organisation *" value={formState.organisation} onChange={(e) => updateField('organisation', e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm" />
-                      <input type="number" placeholder="Nombre de participants" value={formState.nbParticipants} onChange={(e) => updateField('nbParticipants', e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm" />
-                    </div>
-                  </div>
-                )}
                 <CustomFieldsRenderer fields={customFields} step={2} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
-              </div>
+              </PdfStepCard>
             )}
 
-            {step === 3 && (
-              <div className="space-y-4">
+            {activeStepKey === '2b' && (
+              <PdfStepCard
+                tone="academie"
+                stepNum="2b"
+                title="Organisation"
+                subtitle="Informations de l'entreprise ou institution"
+                stepMeta="Étape 2b sur 4"
+              >
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Niveau d’études</label>
+                  <PdfField label="Nom de l'organisation" required error={fieldErrors.organisation}>
+                    <input
+                      type="text"
+                      placeholder="Ex. : Société XYZ SARL"
+                      value={formState.organisation}
+                      onChange={(e) => updateField('organisation', e.target.value)}
+                      className={inputClass(Boolean(fieldErrors.organisation))}
+                    />
+                  </PdfField>
+
+                  <PdfField label="Secteur d'activité">
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_secteur_activite"
+                      value={formState.secteurActivite}
+                      onChange={(val) => updateField('secteurActivite', val)}
+                      options={[
+                        ...(!enteredByAgent ? [{ value: '', label: 'Choisir…' }] : []),
+                        'Commerce',
+                        'Banque',
+                        'ONG',
+                        'Administration',
+                        'Éducation',
+                        'Autre',
+                      ]}
+                      className={inputClass(false)}
+                    />
+                  </PdfField>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <PdfField label="Nombre de participants" required error={fieldErrors.nbParticipants}>
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="Ex. : 5"
+                      value={formState.nbParticipants}
+                      onChange={(e) => updateField('nbParticipants', e.target.value)}
+                      className={inputClass(Boolean(fieldErrors.nbParticipants))}
+                    />
+                  </PdfField>
+
+                  <PdfField label="Personne de contact et fonction" required error={fieldErrors.personneContact}>
+                    <input
+                      type="text"
+                      placeholder="Ex. : J. Ilunga, RH"
+                      value={formState.personneContact}
+                      onChange={(e) => updateField('personneContact', e.target.value)}
+                      className={inputClass(Boolean(fieldErrors.personneContact))}
+                    />
+                  </PdfField>
+
+                  <PdfField label="Facture au nom de l'organisation ?">
+                    <PdfRadioGroup
+                      name="aca_facture_org"
+                      value={formState.factureOrganisation}
+                      onChange={(val) => updateField('factureOrganisation', val)}
+                      options={['Oui', 'Non']}
+                      tone="academie"
+                    />
+                  </PdfField>
+                </div>
+              </PdfStepCard>
+            )}
+
+            {activeStepKey === '3' && (
+              <PdfStepCard
+                tone="academie"
+                stepNum="3"
+                title="Profil"
+                subtitle="Aide le formateur à adapter le cours"
+                stepMeta="Étape 3 sur 4"
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <PdfField label="Niveau d'études" required error={fieldErrors.niveauEtudes}>
                     <OfficeAwareSelect
                       officeMode={Boolean(enteredByAgent)}
                       fieldKey="office_niveau_etudes"
                       value={formState.niveauEtudes}
                       onChange={(val) => updateField('niveauEtudes', val)}
-                      options={['Secondaire / Diplôme d’État', 'Graduat / Licence', 'Master / Doctorat', 'Autre']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      options={[
+                        ...(!enteredByAgent ? [{ value: '', label: 'Choisir…' }] : []),
+                        'Sans diplôme',
+                        'Diplôme d’État',
+                        'Graduat (Bac+3)',
+                        'Licence / Master',
+                        'Autre',
+                      ]}
+                      className={inputClass(Boolean(fieldErrors.niveauEtudes))}
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Situation actuelle</label>
-                    <OfficeAwareSelect
-                      officeMode={Boolean(enteredByAgent)}
-                      fieldKey="office_situation"
+                  </PdfField>
+
+                  <PdfField label="Situation actuelle" required error={fieldErrors.situation}>
+                    <PdfRadioGroup
+                      name="aca_situation"
                       value={formState.situation}
                       onChange={(val) => updateField('situation', val)}
-                      options={['Étudiant', 'Employé / Salarié', 'Entrepreneur / Indépendant', 'En recherche d’emploi']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      options={['Étudiant(e)', 'Salarié(e)', 'Sans emploi', 'Entrepreneur(e)']}
+                      tone="academie"
                     />
-                  </div>
+                  </PdfField>
                 </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Niveau en informatique</label>
-                    <OfficeAwareSelect
-                      officeMode={Boolean(enteredByAgent)}
-                      fieldKey="office_niveau_info"
+                  <PdfField label="Votre niveau dans ce domaine" required error={fieldErrors.niveauInfo}>
+                    <PdfRadioGroup
+                      name="aca_niveau_info"
                       value={formState.niveauInfo}
                       onChange={(val) => updateField('niveauInfo', val)}
                       options={['Débutant', 'Intermédiaire', 'Avancé']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      tone="academie"
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Avez-vous un ordinateur portable ?</label>
-                    <OfficeAwareSelect
-                      officeMode={Boolean(enteredByAgent)}
-                      fieldKey="office_oui_non"
+                  </PdfField>
+
+                  <PdfField label="Aurez-vous un ordinateur portable pendant la formation ?" required error={fieldErrors.portable}>
+                    <PdfRadioGroup
+                      name="aca_portable"
                       value={formState.portable}
                       onChange={(val) => updateField('portable', val)}
                       options={['Oui', 'Non']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      tone="academie"
                     />
+                  </PdfField>
+                </div>
+
+                <PdfField label="Qu'attendez-vous de cette formation ?">
+                  <div>
+                    <textarea
+                      rows={3}
+                      maxLength={300}
+                      placeholder="Facultatif — 300 caractères maximum"
+                      value={formState.attentes}
+                      onChange={(e) => updateField('attentes', e.target.value)}
+                      className={inputClass(false)}
+                    />
+                    <p className="mt-1 text-right font-mono-tabular text-[11px] text-slate-400">
+                      {formState.attentes.length} / 300 caractères
+                    </p>
+                  </div>
+                </PdfField>
+
+                <PdfField label="Comment nous avez-vous connus ?">
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_source_connaissance"
+                    value={formState.source}
+                    onChange={(val) => updateField('source', val)}
+                    options={[
+                      ...(!enteredByAgent ? [{ value: '', label: 'Choisir…' }] : []),
+                      'WhatsApp',
+                      'Facebook',
+                      'Instagram',
+                      'Affiche / flyer',
+                      'Un ami',
+                      'Client Lomakrev',
+                      'Autre',
+                    ]}
+                    className={inputClass(false)}
+                  />
+                </PdfField>
+
+                <CustomFieldsRenderer fields={customFields} step={3} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
+              </PdfStepCard>
+            )}
+
+            {activeStepKey === '4' && (
+              <PdfStepCard tone="academie" stepNum="4" title="Vérification et envoi" stepMeta="Étape 4 sur 4">
+                <div className="space-y-3">
+                  <PdfSummarySection
+                    title="1 · Formation"
+                    onEdit={() => setActiveStepKey('1')}
+                    items={[
+                      { label: 'Formation', value: selectedFormation?.title || '—' },
+                      {
+                        label: 'Session & format',
+                        value: `${currentSession ? formatDateFr(currentSession.startDate) : formState.sessionCode} · ${formState.format}`,
+                      },
+                      { label: 'Prix', value: currentSession?.priceUsd ? `${currentSession.priceUsd} USD` : 'À confirmer' },
+                      { label: 'Type', value: formState.typeInscription },
+                    ]}
+                  />
+                  <PdfSummarySection
+                    title="2 · Participant"
+                    onEdit={() => setActiveStepKey('2')}
+                    items={[
+                      { label: 'Nom complet', value: `${formState.nom} ${formState.postnom} ${formState.prenom}`.trim() },
+                      { label: 'Téléphone / WhatsApp', value: `${formState.phone} (WA : ${formState.sameWhatsapp ? formState.phone : formState.whatsapp})` },
+                      { label: 'Localisation', value: `${resolvedCommune}, ${formState.ville}` },
+                    ]}
+                  />
+                  {isOrg && (
+                    <PdfSummarySection
+                      title="2b · Organisation"
+                      onEdit={() => setActiveStepKey('2b')}
+                      items={[
+                        { label: 'Organisation', value: formState.organisation },
+                        { label: 'Participants', value: `${formState.nbParticipants} participant(s)` },
+                        { label: 'Contact RH / responsable', value: formState.personneContact },
+                      ]}
+                    />
+                  )}
+                </div>
+
+                <PdfField
+                  label="Mode de paiement envisagé"
+                  required
+                  helper="Information seulement : aucun paiement en ligne. Les modalités sont communiquées à la confirmation."
+                  error={fieldErrors.modePaiement}
+                >
+                  <PdfRadioGroup
+                    name="aca_paiement"
+                    value={formState.modePaiement}
+                    onChange={(val) => updateField('modePaiement', val)}
+                    options={[
+                      'Mobile Money (M-Pesa, Airtel Money, Orange Money)',
+                      'Espèces au bureau',
+                      'Virement bancaire',
+                    ]}
+                    tone="academie"
+                  />
+                </PdfField>
+
+                <div className="space-y-2.5 pt-1">
+                  <div>
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={formState.acceptReglement}
+                        onChange={(e) => updateField('acceptReglement', e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#1E293B]"
+                      />
+                      <span>
+                        J'ai lu et j'accepte le règlement de la Lomakrev Académie. <span className="text-[#D90A14]">*</span>
+                      </span>
+                    </label>
+                    {fieldErrors.acceptReglement && <p className="mt-1 pl-6 text-xs font-medium text-[#D90A14]">{fieldErrors.acceptReglement}</p>}
+                  </div>
+
+                  <div>
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={formState.consent}
+                        onChange={(e) => updateField('consent', e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#1E293B]"
+                      />
+                      <span>
+                        J'accepte que Lomakrev Group traite mes données pour gérer mon inscription. <span className="text-[#D90A14]">*</span>
+                      </span>
+                    </label>
+                    {fieldErrors.consent && <p className="mt-1 pl-6 text-xs font-medium text-[#D90A14]">{fieldErrors.consent}</p>}
+                  </div>
+
+                  <div>
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={formState.consentMessages}
+                        onChange={(e) => updateField('consentMessages', e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#1E293B]"
+                      />
+                      <span>
+                        J'accepte de recevoir des messages (SMS, WhatsApp, e-mail) au sujet de ma formation. <span className="text-[#D90A14]">*</span>
+                      </span>
+                    </label>
+                    {fieldErrors.consentMessages && <p className="mt-1 pl-6 text-xs font-medium text-[#D90A14]">{fieldErrors.consentMessages}</p>}
                   </div>
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Vos attentes pour cette formation</label>
-                  <textarea rows={3} value={formState.attentes} onChange={(e) => updateField('attentes', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                </div>
-                <CustomFieldsRenderer fields={customFields} step={3} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
-              </div>
+
+                {fieldErrors.submit && <p className="text-sm font-medium text-[#D90A14]">{fieldErrors.submit}</p>}
+              </PdfStepCard>
             )}
 
-            {step === 4 && (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm space-y-1.5">
-                  <p><strong>Formation :</strong> {selectedFormation?.title}</p>
-                  <p><strong>Session :</strong> {formState.sessionCode} ({formState.format})</p>
-                  <p><strong>Apprenant :</strong> {formState.prenom} {formState.nom} {formState.postnom}</p>
-                  <p><strong>Téléphone :</strong> {formState.phone}</p>
-                </div>
-                <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
-                  <input type="checkbox" checked={formState.consent} onChange={(e) => updateField('consent', e.target.checked)} className="mt-1 h-4 w-4 accent-[#D90A14]" />
-                  <span>J’accepte le règlement intérieur de Lomakrev Académie et la politique de confidentialité de LOMAKREV GROUP.</span>
-                </label>
-              </div>
-            )}
-
-            {error && <p className="text-sm font-medium text-[#D90A14]">{error}</p>}
-
-            <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-5">
-              {step > 1 ? (
-                <button type="button" onClick={() => setStep((s) => s - 1)} className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700">
-                  Précédent
-                </button>
-              ) : (
-                <span />
-              )}
-              {step < 4 ? (
-                <button type="button" onClick={nextStep} className="rounded-lg bg-[#D90A14] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#B80811]">
-                  Continuer
-                </button>
-              ) : (
-                <button type="submit" disabled={submitting} className="rounded-lg bg-[#D90A14] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#b80811] disabled:opacity-60">
-                  {submitting ? 'Validation...' : 'Confirmer l’inscription'}
-                </button>
-              )}
-            </div>
+            <PdfFormActions
+              canGoBack={activeStepKey !== '1'}
+              onBack={handleBack}
+              showSaveDraft={!enteredByAgent}
+              onSaveDraft={handleSaveDraft}
+              isLastStep={activeStepKey === '4'}
+              onNext={validateAndNext}
+              submitLabel="Envoyer mon inscription"
+              submitting={submitting}
+              submittingLabel="Envoi en cours..."
+            />
           </form>
-        </div>
+        </PdfFormShell>
       )}
     </div>
   );

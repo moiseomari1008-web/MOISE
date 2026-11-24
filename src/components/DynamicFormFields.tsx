@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Copy, FileText, Share2, Trash2, Upload, WifiOff, ArrowRight } from 'lucide-react';
+import { ArrowRight, Check, Copy, FileText, Share2, Trash2, Upload, WifiOff } from 'lucide-react';
 import type { CustomFormField } from '../types/lomakrev';
 import { compressImageFile } from '../lib/offlineSync';
 import { buildFacebookShareUrl, buildWhatsAppShareUrl } from '../lib/pdfPrint';
@@ -11,8 +11,63 @@ export function validateRdcPhone(value: string): boolean {
   return /^\+?243[0-9]{9}$/.test(clean);
 }
 
+function strip243Prefix(val: string): string {
+  const digits = (val || '').replace(/[^0-9]/g, '');
+  if (digits.startsWith('243')) return digits.slice(3, 12);
+  if (digits.startsWith('0')) return digits.slice(1, 10);
+  return digits.slice(0, 9);
+}
+
+function format9Digits(digits: string): string {
+  const d = digits.slice(0, 9);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)} ${d.slice(2)}`;
+  return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}`;
+}
+
+export const RdcPhoneBox: React.FC<{
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  hasError?: boolean;
+  disabled?: boolean;
+  autoComplete?: string;
+}> = ({ value, onChange, placeholder = '81 234 5678', hasError = false, disabled = false, autoComplete = 'tel' }) => {
+  const localDigits = strip243Prefix(value);
+  const displayVal = format9Digits(localDigits);
+
+  const handleLocalChange = (raw: string) => {
+    const cleanDigits = raw.replace(/[^0-9]/g, '').replace(/^0+/, '').slice(0, 9);
+    onChange(cleanDigits ? `+243${cleanDigits}` : '+243');
+  };
+
+  return (
+    <div
+      className={`flex items-stretch overflow-hidden rounded-lg border transition-colors ${
+        hasError ? 'border-[#D90A14] bg-red-50/30' : 'border-slate-300 bg-white focus-within:border-[#D90A14]'
+      } ${disabled ? 'bg-slate-50 text-slate-500' : ''}`}
+    >
+      <span className="flex shrink-0 items-center border-r border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 font-mono-tabular select-none">
+        +243
+      </span>
+      <input
+        type="tel"
+        inputMode="numeric"
+        autoComplete={autoComplete}
+        spellCheck={false}
+        disabled={disabled}
+        value={displayVal}
+        onChange={(e) => handleLocalChange(e.target.value)}
+        placeholder={placeholder}
+        className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm sm:text-base text-slate-900 font-mono-tabular outline-none placeholder:text-slate-400"
+      />
+    </div>
+  );
+};
+
 export const RdcPhoneInput: React.FC<{
   label?: string;
+  whatsappLabel?: string;
   phone: string;
   onPhoneChange: (val: string) => void;
   whatsapp?: string;
@@ -20,10 +75,13 @@ export const RdcPhoneInput: React.FC<{
   sameForWhatsapp?: boolean;
   onSameChange?: (same: boolean) => void;
   error?: string;
+  whatsappError?: string;
   showWhatsappOption?: boolean;
   autoComplete?: string;
+  layout?: 'stack' | 'grid';
 }> = ({
-  label = 'Numéro de téléphone (RDC)',
+  label = 'Téléphone',
+  whatsappLabel = 'Numéro WhatsApp',
   phone,
   onPhoneChange,
   whatsapp = '',
@@ -31,71 +89,73 @@ export const RdcPhoneInput: React.FC<{
   sameForWhatsapp = true,
   onSameChange,
   error,
+  whatsappError,
   showWhatsappOption = true,
   autoComplete,
+  layout = 'stack',
 }) => {
-  const handleInput = (val: string) => {
-    let next = val;
-    if (!next.startsWith('+243')) {
-      const digits = next.replace(/[^0-9]/g, '');
-      next = digits.startsWith('243') ? `+${digits}` : `+243${digits.replace(/^0+/, '')}`;
-    }
-    onPhoneChange(next);
-    if (sameForWhatsapp && onWhatsappChange) {
-      onWhatsappChange(next);
-    }
-  };
-
   const resolvedAutoComplete = autoComplete ?? (showWhatsappOption ? 'tel' : 'off');
 
-  return (
-    <div className="space-y-3">
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-slate-800">
-          {label} <span className="text-[#D90A14]">*</span>
-        </label>
-        <input
-          type="tel"
-          autoComplete={resolvedAutoComplete}
-          spellCheck={false}
-          value={phone || '+243'}
-          onChange={(e) => handleInput(e.target.value)}
-          placeholder="+243990000000"
-          className={`w-full rounded-lg border px-4 py-3 text-base text-slate-900 font-mono-tabular outline-none transition-colors focus:border-[#D90A14] ${
-            error ? 'border-[#D90A14] bg-red-50/40' : 'border-slate-300 bg-white'
-          }`}
-        />
-        <p className="mt-1 text-xs text-slate-500">Format attendu : +243 suivi de 9 chiffres (Vodacom, Airtel, Orange, Africell).</p>
-        {error && <p className="mt-1 text-xs font-medium text-[#D90A14]">{error}</p>}
-      </div>
+  const phoneField = (
+    <div>
+      <label className="mb-1.5 block text-sm font-semibold text-slate-800">
+        {label} <span className="text-[#D90A14]">*</span>
+      </label>
+      <RdcPhoneBox
+        value={phone}
+        onChange={(next) => {
+          onPhoneChange(next);
+          if (sameForWhatsapp && onWhatsappChange) onWhatsappChange(next);
+        }}
+        hasError={Boolean(error)}
+        autoComplete={resolvedAutoComplete}
+      />
+      <p className="mt-1 text-xs text-slate-500">Format vérifié automatiquement (9 chiffres après +243).</p>
+      {error && <p className="mt-1 text-xs font-medium text-[#D90A14]">{error}</p>}
+    </div>
+  );
 
-      {showWhatsappOption && onSameChange && (
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
+  const whatsappField = showWhatsappOption && onWhatsappChange && (
+    <div>
+      <label className="mb-1.5 block text-sm font-semibold text-slate-800">{whatsappLabel}</label>
+      <RdcPhoneBox
+        value={sameForWhatsapp ? phone : whatsapp}
+        onChange={(next) => onWhatsappChange(next)}
+        disabled={sameForWhatsapp}
+        hasError={Boolean(whatsappError)}
+        autoComplete="off"
+      />
+      {onSameChange && (
+        <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-slate-600 select-none">
           <input
             type="checkbox"
             checked={sameForWhatsapp}
             onChange={(e) => {
               onSameChange(e.target.checked);
-              if (e.target.checked && onWhatsappChange) onWhatsappChange(phone);
+              if (e.target.checked) onWhatsappChange(phone);
             }}
-            className="h-4 w-4 rounded border-slate-300 accent-[#D90A14]"
+            className="h-3.5 w-3.5 rounded border-slate-300 accent-[#D90A14]"
           />
-          <span>Même numéro pour WhatsApp</span>
+          <span>Même numéro que le téléphone</span>
         </label>
       )}
+      {whatsappError && <p className="mt-1 text-xs font-medium text-[#D90A14]">{whatsappError}</p>}
+    </div>
+  );
 
-      {showWhatsappOption && !sameForWhatsapp && onWhatsappChange && (
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-800">Numéro WhatsApp</label>
-          <input
-            type="tel"
-            value={whatsapp || '+243'}
-            onChange={(e) => onWhatsappChange(e.target.value)}
-            placeholder="+243990000000"
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 font-mono-tabular outline-none focus:border-[#D90A14]"
-          />
-        </div>
-      )}
+  if (layout === 'grid' && whatsappField) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {phoneField}
+        {whatsappField}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {phoneField}
+      {whatsappField}
     </div>
   );
 };
@@ -113,16 +173,20 @@ export const FileAttachmentPicker: React.FC<{
   files: AttachmentFile[];
   onChange: (files: AttachmentFile[]) => void;
   maxFiles?: number;
+  maxSizeMb?: number;
   accept?: string;
   helperText?: string;
+  error?: string;
 }> = ({
   label,
   required = false,
   files,
   onChange,
   maxFiles = 5,
+  maxSizeMb = 10,
   accept = '.jpg,.jpeg,.png,.pdf',
-  helperText = 'JPG, PNG ou PDF · 10 Mo max. par fichier',
+  helperText = 'JPG, PNG ou PDF · 10 Mo max.',
+  error,
 }) => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -132,18 +196,19 @@ export const FileAttachmentPicker: React.FC<{
     setErr('');
     setBusy(true);
     try {
-      const next = [...files];
+      const next = maxFiles === 1 ? [] : [...files];
       for (const file of Array.from(fileList)) {
-        if (next.length >= maxFiles) {
+        if (next.length >= maxFiles && maxFiles > 1) {
           setErr(`Maximum ${maxFiles} fichiers autorisés.`);
           break;
         }
-        if (file.size > 10 * 1024 * 1024) {
-          setErr(`${file.name} dépasse 10 Mo.`);
+        if (file.size > maxSizeMb * 1024 * 1024) {
+          setErr(`${file.name} dépasse ${maxSizeMb} Mo.`);
           continue;
         }
         const dataUrl = await compressImageFile(file);
         next.push({ name: file.name, type: file.type, size: file.size, dataUrl });
+        if (maxFiles === 1) break;
       }
       onChange(next);
     } catch {
@@ -154,33 +219,42 @@ export const FileAttachmentPicker: React.FC<{
   };
 
   return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-slate-800">
+    <div className="space-y-1.5">
+      <label className="block text-sm font-semibold text-slate-800">
         {label} {required && <span className="text-[#D90A14]">*</span>}
       </label>
-      <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-[#F4B400]/70 bg-[#FFFDF5] px-4 py-6 text-center transition-colors hover:border-[#D90A14]/60 hover:bg-[#FFFBEB]">
-        <Upload className="mb-2 h-5 w-5 text-[#D90A14]" />
-        <span className="text-sm font-medium text-slate-800">
-          {busy ? 'Compression en cours...' : 'Sélectionner un ou plusieurs fichiers'}
-        </span>
+      <label
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-4 py-5 text-center transition-colors ${
+          error || err
+            ? 'border-[#D90A14]/60 bg-red-50/30 hover:bg-red-50/50'
+            : 'border-slate-300 bg-slate-50/40 hover:border-slate-400 hover:bg-slate-50'
+        }`}
+      >
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+          <Upload className="h-4 w-4 text-slate-500" />
+          <span>{busy ? 'Traitement du fichier...' : 'Ajouter un fichier ou prendre une photo'}</span>
+        </div>
         <span className="mt-1 text-xs text-slate-500">{helperText}</span>
         <input
           type="file"
           multiple={maxFiles > 1}
           accept={accept}
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = '';
+          }}
           className="hidden"
         />
       </label>
-      {err && <p className="text-xs font-medium text-[#D90A14]">{err}</p>}
+      {(err || error) && <p className="text-xs font-medium text-[#D90A14]">{err || error}</p>}
       {files.length > 0 && (
         <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
           {files.map((f, idx) => (
-            <li key={`${f.name}-${idx}`} className="flex items-center justify-between px-3 py-2 text-sm">
+            <li key={`${f.name}-${idx}`} className="flex items-center justify-between px-3 py-2 text-xs sm:text-sm">
               <div className="flex items-center gap-2 truncate">
-                <FileText className="h-4 w-4 shrink-0 text-slate-500" />
+                <FileText className="h-4 w-4 shrink-0 text-emerald-700" />
                 <span className="truncate font-medium text-slate-800">{f.name}</span>
-                <span className="text-xs text-slate-400 tabular-nums">({Math.round(f.size / 1024)} Ko)</span>
+                <span className="text-xs text-slate-400 tabular-nums">({Math.max(1, Math.round(f.size / 1024))} Ko)</span>
               </div>
               <button
                 type="button"
@@ -221,7 +295,7 @@ export const CustomFieldsRenderer: React.FC<{
         const val = values[f.name];
         return (
           <div key={f.id}>
-            <label className="mb-1.5 block text-sm font-medium text-slate-800">
+            <label className="mb-1.5 block text-sm font-semibold text-slate-800">
               {f.label} {f.required && <span className="text-[#D90A14]">*</span>}
             </label>
             {f.type === 'textarea' ? (
@@ -230,7 +304,7 @@ export const CustomFieldsRenderer: React.FC<{
                 value={String(val || '')}
                 onChange={(e) => onChange(f.name, e.target.value)}
                 placeholder={f.placeholder || ''}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none focus:border-[#D90A14]"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm sm:text-base text-slate-900 outline-none focus:border-[#D90A14]"
               />
             ) : f.type === 'select' ? (
               <OfficeAwareSelect
@@ -239,25 +313,25 @@ export const CustomFieldsRenderer: React.FC<{
                 value={String(val || '')}
                 onChange={(nextVal) => onChange(f.name, nextVal)}
                 options={[
-                  ...(!officeMode ? [{ value: '', label: 'Sélectionner...' }] : []),
+                  ...(!officeMode ? [{ value: '', label: 'Choisir…' }] : []),
                   ...(f.options || []).map((opt) => ({ value: opt, label: opt })),
                 ]}
-                placeholder={f.placeholder || 'Sélectionner ou saisir...'}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-[#D90A14]"
+                placeholder={f.placeholder || 'Choisir ou saisir...'}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm sm:text-base text-slate-900 outline-none focus:border-[#D90A14]"
               />
             ) : f.type === 'radio' ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
                 {(f.options || []).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => onChange(f.name, opt)}
-                    className={`rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
-                      val === opt ? 'border-[#D90A14] bg-[#D90A14] text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-[#FFFBEB]'
-                    }`}
-                  >
-                    {opt}
-                  </button>
+                  <label key={opt} className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+                    <input
+                      type="radio"
+                      name={`custom_${f.name}`}
+                      checked={val === opt}
+                      onChange={() => onChange(f.name, opt)}
+                      className="h-4 w-4 accent-[#D90A14]"
+                    />
+                    <span>{opt}</span>
+                  </label>
                 ))}
               </div>
             ) : f.type === 'checkbox' || f.type === 'consent' ? (
@@ -276,7 +350,7 @@ export const CustomFieldsRenderer: React.FC<{
                 value={String(val || '')}
                 onChange={(e) => onChange(f.name, e.target.value)}
                 placeholder={f.placeholder || ''}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-[#D90A14]"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm sm:text-base text-slate-900 outline-none focus:border-[#D90A14]"
               />
             )}
           </div>
@@ -295,65 +369,108 @@ export const SubmissionSuccessCard: React.FC<{
     status: string;
     eligibilityStatus?: string | null;
     eligibilityReason?: string | null;
+    autoMessage?: string | null;
   };
+  title?: string;
+  bulletPoints?: string[];
+  smsPreview?: string;
   nextStepsText?: string;
+  resetLabel?: string;
   onReset?: () => void;
-}> = ({ offline, localId, dossier, nextStepsText, onReset }) => {
+}> = ({
+  offline,
+  localId,
+  dossier,
+  title,
+  bulletPoints,
+  smsPreview,
+  nextStepsText,
+  resetLabel = 'Retour',
+  onReset,
+}) => {
   const { navigate, data } = useApp();
+  const autoSmsText = smsPreview || dossier?.autoMessage || '';
 
   return (
-    <div className="rounded-xl border border-[#F4B400]/50 bg-white p-6 sm:p-8 shadow-sm">
-      <div className="flex items-start gap-4">
-        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${offline ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-red-50 text-[#D90A14]'}`}>
-          {offline ? <WifiOff className="h-6 w-6" /> : <Check className="h-6 w-6" />}
+    <div
+      className={`rounded-xl border-2 bg-white p-6 sm:p-7 shadow-xs ${
+        offline ? 'border-amber-500' : 'border-emerald-600'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+            offline ? 'bg-amber-100 text-amber-800' : 'bg-emerald-600 text-white'
+          }`}
+        >
+          {offline ? <WifiOff className="h-4 w-4" /> : <Check className="h-4 w-4 stroke-[2.75]" />}
         </div>
-        <div className="flex-1 space-y-3">
-          <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
-            {offline ? 'Dossier sauvegardé hors ligne' : 'Demande enregistrée avec succès'}
-          </h2>
-          {offline ? (
-            <p className="text-sm leading-relaxed text-slate-600">
-              Aucune connexion Internet détectée. Vos informations ont été enregistrées en sécurité sur cet appareil (identifiant local{' '}
-              <span className="font-mono-tabular font-semibold text-slate-900">{localId}</span>). Elles seront transmises automatiquement dès le retour de la connexion.
+        <h2 className="font-display text-lg font-extrabold text-slate-900 sm:text-xl">
+          {offline ? 'Dossier sauvegardé hors ligne' : title || 'Demande bien reçue'}
+        </h2>
+      </div>
+
+      {offline ? (
+        <p className="mt-4 text-sm leading-relaxed text-slate-600">
+          Aucune connexion Internet détectée. Vos informations ont été enregistrées en sécurité sur cet appareil (identifiant local{' '}
+          <span className="font-mono-tabular font-semibold text-slate-900">{localId}</span>). Elles seront transmises automatiquement dès le retour de la connexion.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-4">
+          <div className="inline-block rounded-lg border border-dashed border-emerald-500 bg-emerald-50/50 px-4 py-2.5">
+            <p className="text-[11px] font-medium text-emerald-900/80">Votre numéro de dossier</p>
+            <p className="mt-0.5 font-mono-tabular text-xl font-extrabold tracking-wider text-emerald-800 sm:text-2xl">
+              {dossier?.reference}
             </p>
-          ) : (
-            <>
-              <div className="rounded-lg border border-[#F4B400]/50 bg-[#FFFDF5] p-4">
-                <p className="text-xs font-medium text-slate-600">Numéro de référence officiel</p>
-                <p className="mt-1 font-mono-tabular text-2xl font-bold text-[#D90A14]">{dossier?.reference}</p>
-                <p className="mt-2 text-sm text-slate-700">
-                  Demandeur : <strong>{dossier?.applicantName}</strong> · Statut actuel : <strong>{dossier?.status}</strong>
-                </p>
-                {dossier?.eligibilityReason && (
-                  <p className="mt-2 text-sm font-medium text-[#92400E]">Motif communiqué : {dossier.eligibilityReason}</p>
-                )}
-              </div>
-              <p className="text-sm leading-relaxed text-slate-600">
-                {nextStepsText || data?.settings?.responseDelayText || 'Nous vous rappelons sous 24 h ouvrées.'} Un accusé de réception vient d’être préparé par SMS/WhatsApp et e-mail.
-              </p>
-            </>
+          </div>
+
+          {dossier?.eligibilityReason && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm font-medium text-amber-950">
+              Motif communiqué : {dossier.eligibilityReason}
+            </p>
           )}
 
-          <div className="flex flex-wrap gap-3 pt-2">
-            {!offline && dossier?.reference && (
-              <button
-                type="button"
-                onClick={() => navigate(`/suivi?ref=${encodeURIComponent(dossier.reference)}`)}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#D90A14] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#b80811]"
-              >
-                Suivre mon dossier
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => (onReset ? onReset() : navigate('/'))}
-              className="rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-5 py-2.5 text-sm font-semibold text-[#78350F] hover:bg-[#FEF3C7]"
-            >
-              Retour à l’accueil
-            </button>
-          </div>
+          {bulletPoints && bulletPoints.length > 0 ? (
+            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
+              {bulletPoints.map((pt, idx) => (
+                <li key={idx}>{pt}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm leading-relaxed text-slate-600">
+              {nextStepsText || data?.settings?.responseDelayText || 'Nous vous rappelons sous 24 h ouvrées.'}
+            </p>
+          )}
+
+          {autoSmsText && (
+            <div className="rounded-lg border border-slate-200 bg-slate-100/80 p-3.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                MESSAGE SMS / WHATSAPP ENVOYÉ AUTOMATIQUEMENT
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-800 sm:text-sm">{autoSmsText}</p>
+            </div>
+          )}
         </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        {!offline && dossier?.reference && (
+          <button
+            type="button"
+            onClick={() => navigate(`/suivi?ref=${encodeURIComponent(dossier.reference)}`)}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#D90A14] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#b80811]"
+          >
+            Suivre mon dossier
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => (onReset ? onReset() : navigate('/'))}
+          className="inline-flex h-10 items-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          {resetLabel}
+        </button>
       </div>
     </div>
   );

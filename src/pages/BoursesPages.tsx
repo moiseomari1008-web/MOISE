@@ -1,19 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, ArrowRight, Bookmark, Calendar, CheckCircle2, ShieldAlert, Users } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, CheckCircle2, ShieldAlert, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Breadcrumbs } from '../components/Layout';
 import { PhotoFrame } from '../components/MotionPrimitives';
 import {
   CustomFieldsRenderer,
   FileAttachmentPicker,
+  RdcPhoneBox,
   RdcPhoneInput,
   ShareButton,
   SubmissionSuccessCard,
   validateRdcPhone,
   type AttachmentFile,
 } from '../components/DynamicFormFields';
+import {
+  PdfCallout,
+  PdfField,
+  PdfFormActions,
+  PdfFormShell,
+  PdfRadioGroup,
+  PdfStepCard,
+  PdfSummarySection,
+} from '../components/PdfFormKit';
 import { formatDateFr } from '../lib/pdfPrint';
 import { clearFormDraft, loadFormDraft, saveFormDraft } from '../lib/offlineSync';
+import { KINSHASA_COMMUNES, RDC_PROVINCES } from '../lib/rdcGeo';
 import { OfficeAwareSelect } from '../components/DualSelectInput';
 import type { ScholarshipCampaign } from '../types/lomakrev';
 
@@ -323,37 +334,43 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
 
   const [step, setStep] = useState(1);
   const [ageBlocked, setAgeBlocked] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
+  const [idFiles, setIdFiles] = useState<AttachmentFile[]>([]);
+  const [cvFiles, setCvFiles] = useState<AttachmentFile[]>([]);
   const [resumeLink, setResumeLink] = useState<string>('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formState, setFormState] = useState<Record<string, any>>({
     campaignSlug: initialCampaign || 'excel-avance-2027',
     formationChoisie: '',
     dateNaissance: '',
-    disponibilite: 'Oui',
+    disponibilite: '',
     nom: '',
     postnom: '',
     prenom: '',
-    sexe: 'Masculin',
+    sexe: '',
     phone: '+243',
     whatsapp: '+243',
     sameWhatsapp: true,
     email: '',
-    commune: '',
-    ville: 'Kinshasa',
     province: 'Kinshasa',
-    niveauEtudes: 'Graduat / Licence',
+    ville: 'Kinshasa',
+    commune: '',
+    communeAutre: '',
+    adresse: '',
+    niveauEtudes: '',
     etablissement: '',
-    situation: 'Étudiant',
-    clientLomakrev: 'Non',
-    accesOrdinateur: 'Non',
-    niveauInfo: 'Débutant',
+    situation: '',
+    clientLomakrev: '',
+    numeroFacture: '',
+    accesOrdinateur: '',
+    niveauInfo: '',
+    source: '',
     motivation: '',
     projetPro: '',
     declarationHonneur: false,
     consent: false,
+    consentMessages: false,
     _website: '',
   });
-  const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<any>(null);
 
@@ -385,8 +402,22 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
   const openCampaigns = data.campaigns.filter(isCampaignOpen);
   const campaign = data.campaigns.find((c) => c.slug === formState.campaignSlug) || openCampaigns[0] || data.campaigns[0];
   const customFields = data.forms.bourses?.customFields || [];
+  const formationOptions = campaign?.formations?.length ? campaign.formations : ['Excel avancée'];
+  const selectedFormation = formState.formationChoisie || formationOptions[0] || '';
+  const resolvedCommune =
+    formState.province === 'Kinshasa'
+      ? formState.commune === 'Autre'
+        ? formState.communeAutre
+        : formState.commune
+      : formState.commune;
 
   const updateField = (k: string, v: any) => {
+    setFieldErrors((prev) => {
+      if (!prev[k]) return prev;
+      const copy = { ...prev };
+      delete copy[k];
+      return copy;
+    });
     setFormState((prev) => {
       const next = { ...prev, [k]: v };
       if (!enteredByAgent) saveFormDraft('bourses', next);
@@ -394,7 +425,6 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
     });
   };
 
-  // Closed campaign check
   if (campaign && !isCampaignOpen(campaign)) {
     const nextOpen = openCampaigns[0];
     return (
@@ -403,7 +433,7 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-6 sm:p-8">
           <h1 className="font-display text-2xl font-bold text-amber-950">Candidatures clôturées le {formatDateFr(campaign.closeDate)}</h1>
           <p className="mt-2 text-sm leading-relaxed text-amber-900">
-            Les candidatures pour « {campaign.title} » sont fermées. Aucune page d’erreur : vous pouvez consulter nos autres campagnes ouvertes ou la liste d’intérêt Académie 2027.
+            Les candidatures pour « {campaign.title} » sont fermées. Vous pouvez consulter nos autres campagnes ouvertes ou la liste d’intérêt Académie 2027.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             {nextOpen && (
@@ -451,56 +481,78 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
     pushToast('success', 'Brouillon sauvegardé sur cet appareil.');
   };
 
-  const handleNextStep = () => {
-    setError('');
-    if (step === 1) {
+  const validateStep = (targetStep: number): boolean => {
+    const errs: Record<string, string> = {};
+    if (targetStep === 1) {
+      if (!selectedFormation) errs.formationChoisie = 'Veuillez choisir la formation souhaitée.';
       if (!formState.dateNaissance) {
-        setError('Veuillez saisir votre date de naissance.');
-        return;
+        errs.dateNaissance = 'Veuillez saisir votre date de naissance.';
+      } else {
+        const age = calcAgeAt(formState.dateNaissance, campaign.trainingStartDate);
+        if (age < 0) {
+          errs.dateNaissance = 'Date de naissance invalide.';
+        } else if (age < (campaign.minAge || 18)) {
+          // Strict rule: stop immediately and store NOTHING!
+          clearFormDraft('bourses');
+          setAgeBlocked(`Ce programme est réservé aux personnes âgées de ${campaign.minAge || 18} ans et plus. Merci de votre intérêt.`);
+          return false;
+        }
       }
-      const age = calcAgeAt(formState.dateNaissance, campaign.trainingStartDate);
-      if (age < 0) {
-        setError('Date de naissance invalide.');
-        return;
+      if (!formState.disponibilite) errs.disponibilite = 'Veuillez indiquer votre disponibilité.';
+    }
+
+    if (targetStep === 2) {
+      if (!formState.nom.trim()) errs.nom = 'Veuillez indiquer votre nom.';
+      if (!formState.postnom.trim()) errs.postnom = 'Veuillez indiquer votre postnom.';
+      if (!formState.prenom.trim()) errs.prenom = 'Veuillez indiquer votre prénom.';
+      if (!formState.sexe) errs.sexe = 'Veuillez sélectionner votre sexe.';
+      if (!validateRdcPhone(formState.phone)) errs.phone = 'Format requis : +243 suivi de 9 chiffres.';
+      if (!formState.sameWhatsapp && formState.whatsapp && formState.whatsapp !== '+243' && !validateRdcPhone(formState.whatsapp)) {
+        errs.whatsapp = 'Format WhatsApp requis : +243 suivi de 9 chiffres.';
       }
-      if (age < (campaign.minAge || 18)) {
-        // Strict requirement: stop immediately, store NOTHING!
-        clearFormDraft('bourses');
-        setAgeBlocked(`Ce programme est réservé aux personnes âgées de ${campaign.minAge || 18} ans et plus.`);
-        return;
+      if (!formState.province.trim()) errs.province = 'Veuillez choisir votre province.';
+      if (!formState.ville.trim()) errs.ville = 'Veuillez indiquer votre ville.';
+      if (!resolvedCommune.trim()) errs.commune = 'Veuillez choisir ou saisir votre commune.';
+    }
+
+    if (targetStep === 3) {
+      if (!formState.niveauEtudes) errs.niveauEtudes = 'Veuillez choisir votre niveau d’études.';
+      if (!formState.situation) errs.situation = 'Veuillez indiquer votre situation actuelle.';
+      if (!formState.clientLomakrev) errs.clientLomakrev = 'Veuillez répondre à cette question.';
+      if (!formState.accesOrdinateur) errs.accesOrdinateur = 'Veuillez indiquer votre accès à un ordinateur.';
+      if (!formState.niveauInfo) errs.niveauInfo = 'Veuillez sélectionner votre niveau en informatique.';
+    }
+
+    if (targetStep === 4) {
+      if (!formState.motivation.trim()) errs.motivation = 'Veuillez expliquer votre motivation.';
+      if (!formState.projetPro.trim()) errs.projetPro = 'Veuillez préciser ce que vous ferez après la formation.';
+      if (idFiles.length === 0) {
+        errs.idFiles = 'La pièce d’identité (carte d’électeur, passeport ou carte d’étudiant) est obligatoire.';
       }
     }
-    if (step === 2) {
-      if (!formState.nom.trim() || !formState.prenom.trim()) {
-        setError('Veuillez indiquer votre nom et prénom.');
-        return;
-      }
-      if (!validateRdcPhone(formState.phone)) {
-        setError('Numéro RDC invalide (+243 suivi de 9 chiffres).');
-        return;
-      }
-      if (!formState.commune.trim() || !formState.ville.trim()) {
-        setError('Veuillez indiquer votre commune et votre ville.');
-        return;
-      }
-    }
-    if (step === 4) {
-      if (attachments.length === 0) {
-        setError('La pièce d’identité (carte d’électeur, passeport ou carte d’étudiant) est obligatoire.');
-        return;
-      }
-    }
+
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleNextStep = () => {
+    if (!validateStep(step)) return;
     setStep((s) => Math.min(5, s + 1));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    if (!formState.declarationHonneur || !formState.consent) {
-      setError('Veuillez cocher la déclaration sur l’honneur et le consentement.');
+    const errs: Record<string, string> = {};
+    if (!formState.declarationHonneur) errs.declarationHonneur = 'Veuillez certifier l’exactitude des informations.';
+    if (!formState.consent) errs.consent = 'Veuillez accepter le traitement de vos données.';
+    if (!formState.consentMessages) errs.consentMessages = 'Veuillez accepter de recevoir les messages de suivi.';
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
+
     setSubmitting(true);
+    const allAttachments = [...idFiles, ...cvFiles];
     const res = await submitForm(
       'BRS',
       `Bourse ${campaign.title} — ${formState.prenom} ${formState.nom}`,
@@ -509,13 +561,17 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
         phone: formState.phone,
         whatsapp: formState.sameWhatsapp ? formState.phone : formState.whatsapp,
         email: formState.email,
-        commune: formState.commune,
+        commune: resolvedCommune,
         ville: formState.ville,
         campaignSlug: campaign.slug,
-        formationSlug: formState.formationChoisie || campaign.formations[0],
-        attachments,
+        formationSlug: selectedFormation,
+        attachments: allAttachments,
         _website: formState._website,
-        payload: { ...formState, formationChoisie: formState.formationChoisie || campaign.formations[0] },
+        payload: {
+          ...formState,
+          commune: resolvedCommune,
+          formationChoisie: selectedFormation,
+        },
       },
       enteredByAgent
     );
@@ -523,11 +579,11 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
 
     if (res.ageRejected) {
       clearFormDraft('bourses');
-      setAgeBlocked(res.error || 'Ce programme est réservé aux personnes âgées de 18 ans et plus.');
+      setAgeBlocked(res.error || 'Ce programme est réservé aux personnes âgées de 18 ans et plus. Merci de votre intérêt.');
       return;
     }
     if (!res.ok) {
-      setError(res.error || 'Erreur lors de la soumission.');
+      setFieldErrors({ submit: res.error || 'Erreur lors de la soumission.' });
       return;
     }
     if (!enteredByAgent) clearFormDraft('bourses');
@@ -537,25 +593,36 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
   if (ageBlocked) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12">
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-          <ShieldAlert className="mx-auto h-12 w-12 text-[#D90A14]" />
-          <h1 className="mt-4 font-display text-2xl font-bold text-slate-900">Condition d’âge non remplie</h1>
-          <p className="mt-3 text-base text-slate-700">{ageBlocked}</p>
-          <p className="mt-2 text-sm text-slate-500">Aucune donnée personnelle n’a été enregistrée.</p>
-          <button
-            type="button"
-            onClick={() => navigate('/bourses')}
-            className="mt-6 rounded-lg bg-[#D90A14] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#B80811]"
-          >
-            Retour au Programme de Bourses
-          </button>
+        <div className="rounded-xl border border-red-200 bg-white p-6 sm:p-8 shadow-xs">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="h-8 w-8 shrink-0 text-[#D90A14]" />
+            <div>
+              <h1 className="font-display text-xl font-bold text-slate-900">Condition d’âge non remplie</h1>
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50/80 p-4 text-sm font-medium text-red-900">
+                « {ageBlocked} »
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Le formulaire s’arrête ; aucune donnée n’est enregistrée.</p>
+              <button
+                type="button"
+                onClick={() => navigate('/bourses')}
+                className="mt-5 rounded-lg bg-[#D90A14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#B80811]"
+              >
+                Retour au Programme de Bourses
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
+  const inputClass = (hasErr?: boolean) =>
+    `w-full rounded-lg border px-3.5 py-2.5 text-sm sm:text-base outline-none transition-colors ${
+      hasErr ? 'border-[#D90A14] bg-red-50/30' : 'border-slate-300 bg-white focus:border-[#D90A14]'
+    }`;
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:py-12">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10">
       {!enteredByAgent && <Breadcrumbs items={[{ label: 'Programme de Bourses', to: '/bourses' }, { label: 'Candidature' }]} />}
 
       {result ? (
@@ -563,7 +630,16 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
           offline={result.offline}
           localId={result.localId}
           dossier={result.dossier}
-          nextStepsText="Votre dossier a été transmis au comité de sélection. La réception de la candidature ne vaut pas encore attribution de la bourse ; vous serez notifié par SMS/WhatsApp et e-mail après décision de l’équipe."
+          title="Candidature bien reçue"
+          bulletPoints={[
+            'Votre candidature sera étudiée selon les critères du programme.',
+            'Vous serez informé(e) par SMS ou WhatsApp à chaque étape.',
+            'Suivez votre dossier sur lomakrev.com/suivi avec ce numéro et votre téléphone.',
+          ]}
+          smsPreview={
+            result.dossier?.autoMessage ||
+            `LOMAKREV : candidature ${result.dossier?.reference} (${selectedFormation}) bien reçue. Suivi : lomakrev.com/suivi. Ce message ne vaut pas attribution de bourse.`
+          }
           onReset={() => {
             setResult(null);
             if (onDone) onDone();
@@ -571,275 +647,567 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
           }}
         />
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[#D90A14]">
-                {enteredByAgent ? `Assisté au bureau (${enteredByAgent})` : 'Candidature 100 % en ligne'}
-              </p>
-              <h1 className="mt-1 font-display text-2xl font-extrabold text-slate-900">Postuler à une bourse Lomakrev</h1>
-            </div>
-            {!enteredByAgent && (
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-3.5 py-2 text-xs font-semibold text-[#78350F] hover:bg-[#FEF3C7]"
-              >
-                <Bookmark className="h-3.5 w-3.5 text-[#D90A14]" />
-                Enregistrer le brouillon
-              </button>
-            )}
-          </div>
-
-          {resumeLink && (
-            <div className="mb-5 rounded-lg border border-[#F4B400]/50 bg-[#FFFDF5] p-3 text-xs text-slate-700">
-              <strong>Lien de reprise :</strong> <span className="break-all font-mono-tabular">{resumeLink}</span>
-            </div>
-          )}
-
-          <div className="mb-6">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-[#FEF3C7]">
-              <div className="h-full bg-[#D90A14] transition-all" style={{ width: `${(step / 5) * 100}%` }} />
-            </div>
-            <p className="mt-2 text-xs font-medium text-slate-500">Étape {step} sur 5 (4 étapes de saisie + validation)</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <PdfFormShell
+          tone="bourses"
+          poleLabel="PROGRAMME DE BOURSES"
+          title="Candidature au Programme de Bourses"
+          urlHint="lomakrev.com/bourses/postuler?campagne=…"
+          refPreview="BRS-AAAA-00000"
+          introText="Programme réservé aux personnes âgées de 18 ans et plus. Durée : environ 8 minutes. Préparez votre pièce d'identité (photo ou PDF). Vous pouvez enregistrer et reprendre plus tard."
+          steps={[
+            { key: 1, num: '1', label: 'Éligibilité' },
+            { key: 2, num: '2', label: 'Identité' },
+            { key: 3, num: '3', label: 'Situation' },
+            { key: 4, num: '4', label: 'Motivation' },
+            { key: 5, num: '5', label: 'Envoi' },
+          ]}
+          activeStepIndex={step - 1}
+          onStepClick={(idx) => setStep(idx + 1)}
+          enteredByAgent={enteredByAgent}
+          resumeLink={resumeLink}
+        >
+          <form onSubmit={handleSubmit} className="space-y-4">
             <input type="text" value={formState._website} onChange={(e) => updateField('_website', e.target.value)} className="hidden" tabIndex={-1} autoComplete="off" />
 
             {step === 1 && (
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Campagne *</label>
-                  <OfficeAwareSelect
-                    officeMode={Boolean(enteredByAgent)}
-                    fieldKey="office_bourse_campaign"
-                    value={formState.campaignSlug}
-                    onChange={(val) => updateField('campaignSlug', val)}
-                    options={openCampaigns.map((c) => ({ value: c.slug, label: c.title }))}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
-                  />
+              <PdfStepCard
+                tone="bourses"
+                stepNum="1"
+                title="Éligibilité"
+                subtitle="Vérification immédiate des conditions de base"
+                stepMeta="Étape 1 sur 5"
+              >
+                <div className="grid gap-4 md:grid-cols-2">
+                  <PdfField label="Campagne" required helper="Préremplie par le lien partagé ; modifiable.">
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_bourse_campaign"
+                      value={formState.campaignSlug}
+                      onChange={(val) => {
+                        updateField('campaignSlug', val);
+                        updateField('formationChoisie', '');
+                      }}
+                      options={openCampaigns.map((c) => ({ value: c.slug, label: c.title }))}
+                      className={inputClass(false)}
+                    />
+                  </PdfField>
+
+                  <PdfField label="Formation souhaitée" required error={fieldErrors.formationChoisie}>
+                    <PdfRadioGroup
+                      name="brs_formation"
+                      value={selectedFormation}
+                      onChange={(val) => updateField('formationChoisie', val)}
+                      options={formationOptions}
+                      tone="bourses"
+                    />
+                  </PdfField>
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Formation souhaitée *</label>
-                  <OfficeAwareSelect
-                    officeMode={Boolean(enteredByAgent)}
-                    fieldKey="office_bourse_formation"
-                    value={formState.formationChoisie || campaign.formations[0]}
-                    onChange={(val) => updateField('formationChoisie', val)}
-                    options={campaign.formations}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
-                  />
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <PdfField
+                    label="Date de naissance"
+                    required
+                    helper={`Contrôle ${campaign.minAge || 18} ans révolus au début de formation (${formatDateFr(campaign.trainingStartDate)}).`}
+                    error={fieldErrors.dateNaissance}
+                  >
+                    <input
+                      type="date"
+                      value={formState.dateNaissance}
+                      onChange={(e) => updateField('dateNaissance', e.target.value)}
+                      className={inputClass(Boolean(fieldErrors.dateNaissance))}
+                    />
+                  </PdfField>
+
+                  <PdfField label="Serez-vous disponible aux dates de la formation ?" required error={fieldErrors.disponibilite}>
+                    <PdfRadioGroup
+                      name="brs_disponibilite"
+                      value={formState.disponibilite}
+                      onChange={(val) => updateField('disponibilite', val)}
+                      options={['Oui', 'Non']}
+                      tone="bourses"
+                    />
+                  </PdfField>
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">
-                    Date de naissance * (contrôle {campaign.minAge} ans révolus au {formatDateFr(campaign.trainingStartDate)})
-                  </label>
-                  <input type="date" value={formState.dateNaissance} onChange={(e) => updateField('dateNaissance', e.target.value)} className="w-full rounded-lg border border-slate-300 px-4 py-3 text-base" />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Êtes-vous disponible aux dates de la formation ? *</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['Oui', 'Non'].map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => updateField('disponibilite', v)}
-                        className={`rounded-lg border py-3 text-sm font-semibold transition-colors ${
-                          formState.disponibilite === v ? 'border-[#D90A14] bg-[#D90A14] text-white' : 'border-slate-300 text-slate-700 hover:bg-[#FFFBEB]'
-                        }`}
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
                 <CustomFieldsRenderer fields={customFields} step={1} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
-              </div>
+              </PdfStepCard>
             )}
 
             {step === 2 && (
-              <div className="space-y-4">
+              <PdfStepCard tone="bourses" stepNum="2" title="Identité et contact" stepMeta="Étape 2 sur 5">
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <input type="text" placeholder="Nom *" value={formState.nom} onChange={(e) => updateField('nom', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  <input type="text" placeholder="Postnom" value={formState.postnom} onChange={(e) => updateField('postnom', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  <input type="text" placeholder="Prénom *" value={formState.prenom} onChange={(e) => updateField('prenom', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
+                  <PdfField label="Nom" required error={fieldErrors.nom}>
+                    <input
+                      type="text"
+                      placeholder="Ex. : MBUYI"
+                      value={formState.nom}
+                      onChange={(e) => updateField('nom', e.target.value)}
+                      className={inputClass(Boolean(fieldErrors.nom))}
+                    />
+                  </PdfField>
+                  <PdfField label="Postnom" required error={fieldErrors.postnom}>
+                    <input
+                      type="text"
+                      placeholder="Ex. : KABANGA"
+                      value={formState.postnom}
+                      onChange={(e) => updateField('postnom', e.target.value)}
+                      className={inputClass(Boolean(fieldErrors.postnom))}
+                    />
+                  </PdfField>
+                  <PdfField label="Prénom" required error={fieldErrors.prenom}>
+                    <input
+                      type="text"
+                      placeholder="Ex. : Grâce"
+                      value={formState.prenom}
+                      onChange={(e) => updateField('prenom', e.target.value)}
+                      className={inputClass(Boolean(fieldErrors.prenom))}
+                    />
+                  </PdfField>
                 </div>
-                <OfficeAwareSelect
-                  officeMode={Boolean(enteredByAgent)}
-                  fieldKey="office_sexe"
-                  value={formState.sexe}
-                  onChange={(val) => updateField('sexe', val)}
-                  options={['Masculin', 'Féminin']}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
-                />
-                <RdcPhoneInput
-                  phone={formState.phone}
-                  onPhoneChange={(v) => updateField('phone', v)}
-                  whatsapp={formState.whatsapp}
-                  onWhatsappChange={(v) => updateField('whatsapp', v)}
-                  sameForWhatsapp={formState.sameWhatsapp}
-                  onSameChange={(v) => updateField('sameWhatsapp', v)}
-                />
-                <input type="email" placeholder="E-mail (facultatif)" value={formState.email} onChange={(e) => updateField('email', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <PdfField label="Sexe" required error={fieldErrors.sexe}>
+                    <PdfRadioGroup
+                      name="brs_sexe"
+                      value={formState.sexe}
+                      onChange={(val) => updateField('sexe', val)}
+                      options={['Femme', 'Homme']}
+                      tone="bourses"
+                    />
+                  </PdfField>
+
+                  <RdcPhoneInput
+                    label="Téléphone"
+                    phone={formState.phone}
+                    onPhoneChange={(v) => updateField('phone', v)}
+                    whatsapp={formState.whatsapp}
+                    onWhatsappChange={(v) => updateField('whatsapp', v)}
+                    sameForWhatsapp={formState.sameWhatsapp}
+                    onSameChange={(v) => updateField('sameWhatsapp', v)}
+                    error={fieldErrors.phone}
+                    showWhatsappOption={false}
+                  />
+                </div>
+
+                <div className="max-w-md">
+                  <PdfField label="Numéro WhatsApp" error={fieldErrors.whatsapp}>
+                    <RdcPhoneBox
+                      value={formState.sameWhatsapp ? formState.phone : formState.whatsapp}
+                      onChange={(val) => updateField('whatsapp', val)}
+                      disabled={formState.sameWhatsapp}
+                      hasError={Boolean(fieldErrors.whatsapp)}
+                      autoComplete="off"
+                    />
+                    <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-slate-600 select-none">
+                      <input
+                        type="checkbox"
+                        checked={formState.sameWhatsapp}
+                        onChange={(e) => {
+                          updateField('sameWhatsapp', e.target.checked);
+                          if (e.target.checked) updateField('whatsapp', formState.phone);
+                        }}
+                        className="h-3.5 w-3.5 rounded border-slate-300 accent-[#D90A14]"
+                      />
+                      <span>Même numéro que le téléphone</span>
+                    </label>
+                  </PdfField>
+                </div>
+
+                <PdfField label="Adresse e-mail" helper="Facultatif, mais recommandé pour recevoir les documents.">
+                  <input
+                    type="email"
+                    placeholder="exemple@gmail.com"
+                    value={formState.email}
+                    onChange={(e) => updateField('email', e.target.value)}
+                    className={inputClass(false)}
+                  />
+                </PdfField>
+
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <input type="text" placeholder="Commune *" value={formState.commune} onChange={(e) => updateField('commune', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  <input type="text" placeholder="Ville *" value={formState.ville} onChange={(e) => updateField('ville', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  <input type="text" placeholder="Province *" value={formState.province} onChange={(e) => updateField('province', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
+                  <PdfField label="Province" required error={fieldErrors.province}>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_rdc_province"
+                      value={formState.province}
+                      onChange={(val) => {
+                        updateField('province', val);
+                        updateField('commune', '');
+                      }}
+                      options={RDC_PROVINCES}
+                      className={inputClass(Boolean(fieldErrors.province))}
+                    />
+                  </PdfField>
+
+                  <PdfField label="Ville" required error={fieldErrors.ville}>
+                    <input
+                      type="text"
+                      placeholder="Ex. : Kinshasa"
+                      value={formState.ville}
+                      onChange={(e) => updateField('ville', e.target.value)}
+                      className={inputClass(Boolean(fieldErrors.ville))}
+                    />
+                  </PdfField>
+
+                  <PdfField label="Commune" required error={fieldErrors.commune}>
+                    {formState.province === 'Kinshasa' ? (
+                      <div className="space-y-2">
+                        <OfficeAwareSelect
+                          officeMode={Boolean(enteredByAgent)}
+                          fieldKey="office_kin_commune"
+                          value={formState.commune}
+                          onChange={(val) => updateField('commune', val)}
+                          options={[
+                            ...(!enteredByAgent ? [{ value: '', label: 'Choisir…' }] : []),
+                            ...KINSHASA_COMMUNES.map((c) => ({ value: c, label: c })),
+                            { value: 'Autre', label: 'Autre commune' },
+                          ]}
+                          className={inputClass(Boolean(fieldErrors.commune))}
+                        />
+                        {formState.commune === 'Autre' && (
+                          <input
+                            type="text"
+                            placeholder="Précisez la commune"
+                            value={formState.communeAutre}
+                            onChange={(e) => updateField('communeAutre', e.target.value)}
+                            className={inputClass(Boolean(fieldErrors.commune))}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Votre commune / territoire"
+                        value={formState.commune}
+                        onChange={(e) => updateField('commune', e.target.value)}
+                        className={inputClass(Boolean(fieldErrors.commune))}
+                      />
+                    )}
+                  </PdfField>
                 </div>
+
+                <PdfField label="Adresse (quartier, avenue, numéro)">
+                  <input
+                    type="text"
+                    placeholder="Facultatif"
+                    value={formState.adresse}
+                    onChange={(e) => updateField('adresse', e.target.value)}
+                    className={inputClass(false)}
+                  />
+                </PdfField>
+
                 <CustomFieldsRenderer fields={customFields} step={2} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
-              </div>
+              </PdfStepCard>
             )}
 
             {step === 3 && (
-              <div className="space-y-4">
+              <PdfStepCard
+                tone="bourses"
+                stepNum="3"
+                title="Situation"
+                subtitle="Ces réponses servent au calcul automatique du score"
+                stepMeta="Étape 3 sur 5"
+              >
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Niveau d’études *</label>
+                  <PdfField label="Niveau d'études" required error={fieldErrors.niveauEtudes}>
                     <OfficeAwareSelect
                       officeMode={Boolean(enteredByAgent)}
                       fieldKey="office_niveau_etudes"
                       value={formState.niveauEtudes}
                       onChange={(val) => updateField('niveauEtudes', val)}
-                      options={['Secondaire / Diplôme d’État', 'Graduat / Licence', 'Master / Doctorat', 'Formation professionnelle']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      options={[
+                        ...(!enteredByAgent ? [{ value: '', label: 'Choisir…' }] : []),
+                        'Sans diplôme',
+                        'Diplôme d’État',
+                        'Graduat (Bac+3)',
+                        'Licence / Master',
+                        'Autre',
+                      ]}
+                      className={inputClass(Boolean(fieldErrors.niveauEtudes))}
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Établissement ou filière</label>
-                    <input type="text" value={formState.etablissement} onChange={(e) => updateField('etablissement', e.target.value)} placeholder="Ex. UNIKIN, ISTA, UPC..." className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
-                  </div>
+                  </PdfField>
+
+                  <PdfField label="Établissement ou filière">
+                    <input
+                      type="text"
+                      placeholder="Ex. : UNIKIN — Informatique"
+                      value={formState.etablissement}
+                      onChange={(e) => updateField('etablissement', e.target.value)}
+                      className={inputClass(false)}
+                    />
+                  </PdfField>
                 </div>
+
+                <PdfField label="Situation actuelle" required error={fieldErrors.situation}>
+                  <PdfRadioGroup
+                    name="brs_situation"
+                    value={formState.situation}
+                    onChange={(val) => updateField('situation', val)}
+                    options={['Étudiant(e)', 'Sans emploi', 'Salarié(e)', 'Entrepreneur(e)', 'Autre']}
+                    tone="bourses"
+                  />
+                </PdfField>
+
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Situation actuelle *</label>
-                    <OfficeAwareSelect
-                      officeMode={Boolean(enteredByAgent)}
-                      fieldKey="office_situation"
-                      value={formState.situation}
-                      onChange={(val) => updateField('situation', val)}
-                      options={['Sans emploi', 'Étudiant', 'Employé / Salarié', 'Entrepreneur / Petit commerçant']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Déjà client Lomakrev ?</label>
-                    <OfficeAwareSelect
-                      officeMode={Boolean(enteredByAgent)}
-                      fieldKey="office_oui_non"
+                  <PdfField label="Êtes-vous déjà client de Lomakrev ?" required error={fieldErrors.clientLomakrev}>
+                    <PdfRadioGroup
+                      name="brs_client"
                       value={formState.clientLomakrev}
                       onChange={(val) => updateField('clientLomakrev', val)}
-                      options={['Non', 'Oui']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      options={['Oui', 'Non']}
+                      tone="bourses"
                     />
-                  </div>
+                  </PdfField>
+
+                  {formState.clientLomakrev === 'Oui' && (
+                    <PdfField label="N° de facture ou de commande">
+                      <input
+                        type="text"
+                        placeholder="Ex. : CMD-2026-00412"
+                        value={formState.numeroFacture}
+                        onChange={(e) => updateField('numeroFacture', e.target.value)}
+                        className={inputClass(false)}
+                      />
+                    </PdfField>
+                  )}
                 </div>
+
+                <PdfField label="Avez-vous accès à un ordinateur ?" required error={fieldErrors.accesOrdinateur}>
+                  <PdfRadioGroup
+                    name="brs_acces_pc"
+                    value={formState.accesOrdinateur}
+                    onChange={(val) => updateField('accesOrdinateur', val)}
+                    options={['Oui, personnel', 'Oui, partagé', 'Non']}
+                    tone="bourses"
+                  />
+                </PdfField>
+
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Avez-vous accès à un ordinateur ?</label>
-                    <OfficeAwareSelect
-                      officeMode={Boolean(enteredByAgent)}
-                      fieldKey="office_oui_non"
-                      value={formState.accesOrdinateur}
-                      onChange={(val) => updateField('accesOrdinateur', val)}
-                      options={['Non', 'Oui']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-800">Niveau en informatique</label>
-                    <OfficeAwareSelect
-                      officeMode={Boolean(enteredByAgent)}
-                      fieldKey="office_niveau_info"
+                  <PdfField label="Votre niveau en informatique" required error={fieldErrors.niveauInfo}>
+                    <PdfRadioGroup
+                      name="brs_niveau_info"
                       value={formState.niveauInfo}
                       onChange={(val) => updateField('niveauInfo', val)}
                       options={['Débutant', 'Intermédiaire', 'Avancé']}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      tone="bourses"
                     />
-                  </div>
+                  </PdfField>
+
+                  <PdfField label="Comment avez-vous connu le programme ?">
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_source_connaissance"
+                      value={formState.source}
+                      onChange={(val) => updateField('source', val)}
+                      options={[
+                        ...(!enteredByAgent ? [{ value: '', label: 'Choisir…' }] : []),
+                        'WhatsApp',
+                        'Facebook',
+                        'Instagram',
+                        'Affiche / flyer',
+                        'Un ami',
+                        'Client Lomakrev',
+                        'Autre',
+                      ]}
+                      className={inputClass(false)}
+                    />
+                  </PdfField>
                 </div>
+
                 <CustomFieldsRenderer fields={customFields} step={3} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
-              </div>
+              </PdfStepCard>
             )}
 
             {step === 4 && (
-              <div className="space-y-4">
-                <div>
-                  <div className="mb-1.5 flex justify-between text-sm">
-                    <label className="font-medium text-slate-800">Votre motivation *</label>
-                    <span className="font-mono-tabular text-xs text-slate-500">{formState.motivation.length}/500</span>
-                  </div>
-                  <textarea
-                    rows={4}
-                    maxLength={500}
-                    value={formState.motivation}
-                    onChange={(e) => updateField('motivation', e.target.value)}
-                    placeholder="Expliquez pourquoi vous postulez à cette bourse..."
-                    className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-800">Votre projet professionnel</label>
-                  <textarea
-                    rows={3}
-                    value={formState.projetPro}
-                    onChange={(e) => updateField('projetPro', e.target.value)}
-                    placeholder="Comment cette formation vous aidera-t-elle ?"
-                    className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base"
-                  />
-                </div>
-                <FileAttachmentPicker
-                  label="Pièce d’identité (carte d’électeur, passeport, carte d’étudiant avec date de naissance) + autres pièces"
+              <PdfStepCard tone="bourses" stepNum="4" title="Motivation et pièces jointes" stepMeta="Étape 4 sur 5">
+                <PdfField
+                  label="Pourquoi souhaitez-vous suivre cette formation ?"
                   required
-                  files={attachments}
-                  onChange={setAttachments}
-                />
+                  error={fieldErrors.motivation}
+                >
+                  <div className="relative">
+                    <textarea
+                      rows={3}
+                      maxLength={500}
+                      value={formState.motivation}
+                      onChange={(e) => updateField('motivation', e.target.value)}
+                      placeholder="Expliquez en quelques phrases…"
+                      className={inputClass(Boolean(fieldErrors.motivation))}
+                    />
+                    <p className="mt-1 text-right font-mono-tabular text-[11px] text-slate-400">
+                      {formState.motivation.length} / 500 caractères
+                    </p>
+                  </div>
+                </PdfField>
+
+                <PdfField
+                  label="Que ferez-vous après la formation ?"
+                  required
+                  error={fieldErrors.projetPro}
+                >
+                  <div className="relative">
+                    <textarea
+                      rows={3}
+                      maxLength={300}
+                      value={formState.projetPro}
+                      onChange={(e) => updateField('projetPro', e.target.value)}
+                      placeholder="Votre projet professionnel ou personnel…"
+                      className={inputClass(Boolean(fieldErrors.projetPro))}
+                    />
+                    <p className="mt-1 text-right font-mono-tabular text-[11px] text-slate-400">
+                      {formState.projetPro.length} / 300 caractères
+                    </p>
+                  </div>
+                </PdfField>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FileAttachmentPicker
+                    label="Pièce d'identité"
+                    required
+                    maxFiles={1}
+                    maxSizeMb={5}
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    helperText="Carte d'électeur, passeport ou carte d'étudiant — JPG, PNG ou PDF, 5 Mo max."
+                    files={idFiles}
+                    onChange={(files) => {
+                      setIdFiles(files);
+                      if (files.length > 0) {
+                        setFieldErrors((p) => {
+                          const c = { ...p };
+                          delete c.idFiles;
+                          return c;
+                        });
+                      }
+                    }}
+                    error={fieldErrors.idFiles}
+                  />
+
+                  <FileAttachmentPicker
+                    label="CV ou autre document"
+                    maxFiles={1}
+                    maxSizeMb={5}
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    helperText="Selon la campagne — PDF, 5 Mo max."
+                    files={cvFiles}
+                    onChange={setCvFiles}
+                  />
+                </div>
+
                 <CustomFieldsRenderer fields={customFields} step={4} values={formState} onChange={updateField} />
-              </div>
+              </PdfStepCard>
             )}
 
             {step === 5 && (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm space-y-1.5">
-                  <p><strong>Campagne :</strong> {campaign.title}</p>
-                  <p><strong>Candidat :</strong> {formState.prenom} {formState.nom} {formState.postnom}</p>
-                  <p><strong>Date de naissance :</strong> {formState.dateNaissance}</p>
-                  <p><strong>Téléphone :</strong> {formState.phone} · <strong>Commune :</strong> {formState.commune}</p>
-                  <p><strong>Pièces jointes :</strong> {attachments.length} fichier(s)</p>
+              <PdfStepCard tone="bourses" stepNum="5" title="Vérification et envoi" stepMeta="Étape 5 sur 5">
+                <div className="space-y-3">
+                  <PdfSummarySection
+                    title="1 · Éligibilité"
+                    onEdit={() => setStep(1)}
+                    items={[
+                      { label: 'Campagne', value: campaign.title },
+                      { label: 'Formation souhaitée', value: selectedFormation },
+                      { label: 'Date de naissance', value: formState.dateNaissance ? formatDateFr(formState.dateNaissance) : '—' },
+                      { label: 'Disponible aux dates', value: formState.disponibilite },
+                    ]}
+                  />
+                  <PdfSummarySection
+                    title="2 · Identité et contact"
+                    onEdit={() => setStep(2)}
+                    items={[
+                      { label: 'Nom complet', value: `${formState.nom} ${formState.postnom} ${formState.prenom}`.trim() },
+                      { label: 'Sexe', value: formState.sexe },
+                      { label: 'Téléphone / WhatsApp', value: `${formState.phone} (WA : ${formState.sameWhatsapp ? formState.phone : formState.whatsapp})` },
+                      { label: 'Localisation', value: `${resolvedCommune}, ${formState.ville} (${formState.province})` },
+                    ]}
+                  />
+                  <PdfSummarySection
+                    title="3 · Situation"
+                    onEdit={() => setStep(3)}
+                    items={[
+                      { label: 'Niveau d’études', value: formState.niveauEtudes },
+                      { label: 'Situation actuelle', value: formState.situation },
+                      { label: 'Accès ordinateur', value: formState.accesOrdinateur },
+                      { label: 'Client Lomakrev', value: formState.clientLomakrev === 'Oui' && formState.numeroFacture ? `Oui (${formState.numeroFacture})` : formState.clientLomakrev },
+                    ]}
+                  />
+                  <PdfSummarySection
+                    title="4 · Motivation et pièces jointes"
+                    onEdit={() => setStep(4)}
+                    items={[
+                      { label: 'Pièce d’identité', value: idFiles[0]?.name || '—' },
+                      { label: 'CV / autre document', value: cvFiles[0]?.name || 'Non fourni' },
+                    ]}
+                  />
                 </div>
-                <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
-                  <input type="checkbox" checked={formState.declarationHonneur} onChange={(e) => updateField('declarationHonneur', e.target.checked)} className="mt-1 h-4 w-4 accent-[#D90A14]" />
-                  <span>Je certifie sur l’honneur l’exactitude des informations fournies et n’avoir déposé qu’une seule candidature pour cette campagne.</span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
-                  <input type="checkbox" checked={formState.consent} onChange={(e) => updateField('consent', e.target.checked)} className="mt-1 h-4 w-4 accent-[#D90A14]" />
-                  <span>J’accepte le traitement de mes données personnelles conformément à la politique de confidentialité de LOMAKREV GROUP.</span>
-                </label>
-              </div>
+
+                <div className="space-y-2.5 pt-2">
+                  <div>
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={formState.declarationHonneur}
+                        onChange={(e) => updateField('declarationHonneur', e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#D90A14]"
+                      />
+                      <span>
+                        Je certifie sur l'honneur que les informations fournies sont exactes. <span className="text-[#D90A14]">*</span>
+                      </span>
+                    </label>
+                    {fieldErrors.declarationHonneur && <p className="mt-1 pl-6 text-xs font-medium text-[#D90A14]">{fieldErrors.declarationHonneur}</p>}
+                  </div>
+
+                  <div>
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={formState.consent}
+                        onChange={(e) => updateField('consent', e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#D90A14]"
+                      />
+                      <span>
+                        J'accepte que Lomakrev Group traite mes données pour étudier ma candidature, conformément à la politique de confidentialité.{' '}
+                        <span className="text-[#D90A14]">*</span>
+                      </span>
+                    </label>
+                    {fieldErrors.consent && <p className="mt-1 pl-6 text-xs font-medium text-[#D90A14]">{fieldErrors.consent}</p>}
+                  </div>
+
+                  <div>
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={formState.consentMessages}
+                        onChange={(e) => updateField('consentMessages', e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#D90A14]"
+                      />
+                      <span>
+                        J'accepte de recevoir des messages (SMS, WhatsApp, e-mail) au sujet de ma candidature. <span className="text-[#D90A14]">*</span>
+                      </span>
+                    </label>
+                    {fieldErrors.consentMessages && <p className="mt-1 pl-6 text-xs font-medium text-[#D90A14]">{fieldErrors.consentMessages}</p>}
+                  </div>
+                </div>
+
+                <PdfCallout title="Mention affichée avant l'envoi">
+                  L'envoi de ce formulaire ne garantit pas l'attribution d'une bourse. Les candidatures sont étudiées selon les critères du programme et dans la limite des places disponibles.
+                </PdfCallout>
+
+                {fieldErrors.submit && <p className="text-sm font-medium text-[#D90A14]">{fieldErrors.submit}</p>}
+              </PdfStepCard>
             )}
 
-            {error && <p className="text-sm font-medium text-[#D90A14]">{error}</p>}
-
-            <div className="flex items-center justify-between border-t border-slate-200 pt-5">
-              {step > 1 ? (
-                <button type="button" onClick={() => setStep((s) => s - 1)} className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700">
-                  Précédent
-                </button>
-              ) : (
-                <span />
-              )}
-              {step < 5 ? (
-                <button type="button" onClick={handleNextStep} className="rounded-lg bg-[#D90A14] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#B80811]">
-                  Continuer
-                </button>
-              ) : (
-                <button type="submit" disabled={submitting} className="rounded-lg bg-[#D90A14] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#b80811] disabled:opacity-60">
-                  {submitting ? 'Envoi en cours...' : 'Soumettre ma candidature'}
-                </button>
-              )}
-            </div>
+            <PdfFormActions
+              canGoBack={step > 1}
+              onBack={() => setStep((s) => s - 1)}
+              showSaveDraft={!enteredByAgent}
+              onSaveDraft={handleSaveDraft}
+              isLastStep={step === 5}
+              onNext={handleNextStep}
+              submitLabel="Envoyer ma candidature"
+              submitting={submitting}
+              submittingLabel="Envoi en cours..."
+            />
           </form>
-        </div>
+        </PdfFormShell>
       )}
     </div>
   );
