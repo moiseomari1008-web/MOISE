@@ -1696,6 +1696,25 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const handleDeleteDossier = async (dossier: Dossier) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer le dossier ${dossier.reference} (${dossier.applicantName}) ? Cette action est irréversible.`)) {
+      return;
+    }
+    try {
+      const res = await apiFetch(`/api/admin/dossiers/${dossier.id}`, { method: 'DELETE', headers: authHeaders() });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        pushToast('error', json.error || 'Erreur lors de la suppression du dossier.');
+        return;
+      }
+      pushToast('success', `Dossier ${dossier.reference} supprimé avec succès.`);
+      setSelectedDossier(null);
+      loadAdminData();
+    } catch {
+      pushToast('error', 'Erreur réseau lors de la suppression du dossier.');
+    }
+  };
+
   const handleExportExcel = async (pole: string) => {
     const res = await apiFetch(`/api/admin/export/xlsx?pole=${encodeURIComponent(pole)}`);
     if (!res.ok) {
@@ -2180,19 +2199,34 @@ export const AdminPage: React.FC = () => {
                         </td>
                         <td className="p-3 font-mono-tabular text-xs text-slate-500">{d.provenance}</td>
                         <td className="p-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedDossier(d);
-                              setTeamScoreInputs(d.teamScores || {});
-                              setDiagInput(
-                                d.interventionLog || { diagnostic: '', partsUsed: '', timeSpent: '', scheduledSlot: '' }
-                              );
-                            }}
-                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100"
-                          >
-                            Ouvrir
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedDossier(d);
+                                setTeamScoreInputs(d.teamScores || {});
+                                setDiagInput(
+                                  d.interventionLog || { diagnostic: '', partsUsed: '', timeSpent: '', scheduledSlot: '' }
+                                );
+                              }}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100"
+                            >
+                              Ouvrir
+                            </button>
+                            {!isReadOnly && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteDossier(d);
+                                }}
+                                className="rounded-lg border border-red-200 p-1.5 text-slate-400 hover:bg-red-50 hover:text-[#D90A14]"
+                                title="Supprimer le dossier"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2224,6 +2258,15 @@ export const AdminPage: React.FC = () => {
                         >
                           PDF
                         </button>
+                        {!isReadOnly && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDossier(selectedDossier)}
+                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-[#D90A14] hover:bg-red-50"
+                          >
+                            Supprimer
+                          </button>
+                        )}
                         <button type="button" onClick={() => setSelectedDossier(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
                           <X className="h-5 w-5" />
                         </button>

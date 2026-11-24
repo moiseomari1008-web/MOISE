@@ -2950,6 +2950,27 @@ app.patch('/api/admin/dossiers/:id', requireAuth, (req: AuthedRequest, res) => {
   res.json({ dossier });
 });
 
+app.delete('/api/admin/dossiers/:id', requireAuth, (req: AuthedRequest, res) => {
+  const role = req.user!.role;
+  if (role === 'LECTURE_SEULE') {
+    res.status(403).json({ error: 'Suppression non autorisée en lecture seule.' });
+    return;
+  }
+  const row = db.prepare('SELECT data FROM dossiers WHERE id = ?').get(req.params.id) as { data: string } | undefined;
+  if (!row) {
+    res.status(404).json({ error: 'Dossier introuvable.' });
+    return;
+  }
+  const dossier: Dossier = JSON.parse(row.data);
+  if (!canUserAccessDossier(req.user!, dossier)) {
+    res.status(403).json({ error: 'Accès non autorisé : ce dossier ne relève pas de votre pôle.' });
+    return;
+  }
+  db.prepare('DELETE FROM dossiers WHERE id = ?').run(req.params.id);
+  recordAudit(req.user!, 'Suppression dossier', dossier.reference, dossier.applicantName);
+  res.json({ ok: true, reference: dossier.reference });
+});
+
 // Batch approve scholarships
 app.post('/api/admin/bourses/batch-approve', requireAuth, requireRoles('DIRECTION', 'RESPONSABLE_BOURSES'), (req: AuthedRequest, res) => {
   const { campaignSlug, dossierIds } = req.body || {};
