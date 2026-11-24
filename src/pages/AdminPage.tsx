@@ -39,6 +39,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { compressImageFile } from '../lib/offlineSync';
 import {
+  downloadClientFichePdf,
   extractOrderedPayloadEntries,
   formatCurrencyCdf,
   formatCurrencyUsd,
@@ -48,11 +49,13 @@ import {
   getPoleLabel,
   getPrintFooterInfo,
   triggerPrintDocument,
+  type UnifiedClientProfile,
 } from '../lib/pdfPrint';
 import { AcademieInscriptionPage } from './AcademiePages';
 import { BoursePostulerPage } from './BoursesPages';
 import { MaintenanceDevisPage, MaintenanceInterventionPage } from './MaintenancePages';
 import { DualSelectInput, SelectOptionsProvider } from '../components/DualSelectInput';
+import { ClientFicheModal } from '../components/ClientFicheModal';
 import type {
   AdminNotification,
   AuditLogEntry,
@@ -132,6 +135,7 @@ export const AdminPage: React.FC = () => {
 
   // Printable view overlay
   const [printMode, setPrintMode] = useState<{ kind: 'devis' | 'attestation' | 'presence' | 'dossier'; dossier?: Dossier; title: string } | null>(null);
+  const [clientFicheView, setClientFicheView] = useState<{ client?: UnifiedClientProfile | null; dossier?: Dossier | null } | null>(null);
 
   // Quote editor state
   const [quoteItems, setQuoteItems] = useState<{ description: string; qty: number; unitUsd: number }[]>([
@@ -550,10 +554,29 @@ export const AdminPage: React.FC = () => {
           <button type="button" onClick={() => setPrintMode(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             ← Retour à l’administration
           </button>
-          <button type="button" onClick={triggerPrintDocument} className="inline-flex items-center gap-2 rounded-lg bg-[#D90A14] px-5 py-2 text-sm font-semibold text-white hover:bg-[#b80811]">
-            <Printer className="h-4 w-4" />
-            Imprimer / Enregistrer en PDF
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {d && (printMode.kind === 'dossier' || printMode.kind === 'devis') && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const filename = await downloadClientFichePdf({ settings, dossier: d });
+                    pushToast('success', `PDF téléchargé : ${filename}`);
+                  } catch {
+                    pushToast('error', 'Erreur lors de la génération PDF.');
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+              >
+                <Download className="h-4 w-4" />
+                Garder en PDF
+              </button>
+            )}
+            <button type="button" onClick={triggerPrintDocument} className="inline-flex items-center gap-2 rounded-lg bg-[#D90A14] px-5 py-2 text-sm font-semibold text-white hover:bg-[#b80811]">
+              <Printer className="h-4 w-4" />
+              Imprimer / Enregistrer en PDF
+            </button>
+          </div>
         </div>
 
         <div className="print-sheet mx-auto max-w-4xl overflow-x-auto rounded-xl border border-slate-300 bg-white p-4 sm:p-8 print:overflow-visible">
@@ -2531,40 +2554,65 @@ export const AdminPage: React.FC = () => {
 
           {/* TAB 3: FICHE CLIENT UNIQUE */}
           {activeTab === 'clients' && (
-            <div className="grid gap-4 md:grid-cols-2">
-              {clients.map((cl) => (
-                <div key={cl.phone} className="rounded-xl border border-slate-200 bg-white p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-display text-base font-bold text-slate-900">{cl.name}</h3>
-                      <p className="font-mono-tabular text-xs text-slate-600">{cl.phone} {cl.email ? `· ${cl.email}` : ''}</p>
-                    </div>
-                    {isDirection && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await apiFetch(`/api/admin/clients/${encodeURIComponent(cl.phone)}`, { method: 'DELETE', headers: authHeaders() });
-                          pushToast('success', 'Données client supprimées (RGPD).');
-                          loadAdminData();
-                        }}
-                        className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-[#D90A14]"
-                        title="Supprimer données personnelles"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="mt-4 divide-y divide-slate-100 border-t border-slate-100 pt-2 text-xs">
-                    {cl.dossiers.map((d: Dossier) => (
-                      <div key={d.id} className="flex items-center justify-between py-2">
-                        <span className="font-mono-tabular font-semibold text-slate-900">{d.reference}</span>
-                        <span className="capitalize text-slate-500">{d.pole}</span>
-                        <span className="font-medium text-slate-700">{d.status}</span>
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                {clients.map((cl) => (
+                  <div key={cl.phone} className="rounded-xl border border-slate-200 bg-white p-5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-display text-base font-bold text-slate-900">{cl.name}</h3>
+                        <p className="font-mono-tabular text-xs text-slate-600">{cl.phone} {cl.email ? `· ${cl.email}` : ''}</p>
                       </div>
-                    ))}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setClientFicheView({ client: cl })}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 whitespace-nowrap shrink-0"
+                        >
+                          <Eye className="h-3.5 w-3.5 text-slate-600" />
+                          Fiche / PDF
+                        </button>
+                        {isDirection && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await apiFetch(`/api/admin/clients/${encodeURIComponent(cl.phone)}`, { method: 'DELETE', headers: authHeaders() });
+                              pushToast('success', 'Données client supprimées (RGPD).');
+                              loadAdminData();
+                            }}
+                            className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-[#D90A14]"
+                            title="Supprimer données personnelles"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-4 divide-y divide-slate-100 border-t border-slate-100 pt-2 text-xs">
+                      {cl.dossiers.map((d: Dossier) => (
+                        <div key={d.id} className="flex items-center justify-between gap-2 py-2">
+                          <button
+                            type="button"
+                            onClick={() => setClientFicheView({ dossier: d })}
+                            className="font-mono-tabular font-semibold text-[#D90A14] hover:underline"
+                          >
+                            {d.reference}
+                          </button>
+                          <span className="capitalize text-slate-500">{d.pole}</span>
+                          <span className="font-medium text-slate-700">{d.status}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <ClientFicheModal
+                open={Boolean(clientFicheView)}
+                onClose={() => setClientFicheView(null)}
+                dossier={clientFicheView?.dossier || null}
+                clientProfile={clientFicheView?.client || null}
+                onSelectDossier={(d) => setClientFicheView({ dossier: d as Dossier })}
+              />
             </div>
           )}
 

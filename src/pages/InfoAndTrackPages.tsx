@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, Mail, MapPin, Phone, Search, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Clock, Download, Eye, Mail, MapPin, Phone, Printer, Search, ShieldCheck, Trash2, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Breadcrumbs } from '../components/Layout';
 import { PhotoFrame } from '../components/MotionPrimitives';
 import { RdcPhoneInput, SubmissionSuccessCard, validateRdcPhone } from '../components/DynamicFormFields';
-import { formatDateFr } from '../lib/pdfPrint';
+import { ClientFicheModal } from '../components/ClientFicheModal';
+import { downloadClientFichePdf, formatDateFr, getDossierTypeLabel, getPoleLabel } from '../lib/pdfPrint';
 
 export const SuiviDossierPage: React.FC = () => {
-  const { searchQuery, localReceipts, outboxItems, isOnline, clearReceipts, pushToast } = useApp();
+  const { data, searchQuery, localReceipts, outboxItems, isOnline, clearReceipts, pushToast } = useApp();
   const params = new URLSearchParams(searchQuery);
   const initialRef = params.get('ref') || '';
 
@@ -16,6 +17,8 @@ export const SuiviDossierPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [dossier, setDossier] = useState<any>(null);
+  const [ficheOpen, setFicheOpen] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   useEffect(() => {
     if (initialRef) {
@@ -163,11 +166,53 @@ export const SuiviDossierPage: React.FC = () => {
                 <span className="rounded-md bg-[#FEF3C7] border border-[#F4B400] px-3 py-1 text-xs font-bold text-[#78350F]">{dossier.status}</span>
               </div>
               <p className="mt-2 text-sm text-slate-700">
-                Demandeur : <strong>{dossier.applicantName}</strong> · Créé le {formatDateFr(dossier.createdAt)}
+                Demandeur : <strong>{dossier.applicantName}</strong> · {getPoleLabel(dossier.pole)} ({getDossierTypeLabel(dossier.type)}) · Créé le {formatDateFr(dossier.createdAt)}
               </p>
               {dossier.rejectionReason && (
                 <p className="mt-2 text-sm font-medium text-[#D90A14]">Motif : {dossier.rejectionReason}</p>
               )}
+
+              <div className="mt-4 flex flex-wrap gap-2.5 border-t border-[#F4B400]/30 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setFicheOpen(true)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#D90A14] px-4 text-sm font-semibold text-white hover:bg-[#b80811] whitespace-nowrap shrink-0"
+                >
+                  <Eye className="h-4 w-4" />
+                  Visualiser la fiche client
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFicheOpen(true);
+                    window.setTimeout(() => window.print(), 180);
+                  }}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50 whitespace-nowrap shrink-0"
+                >
+                  <Printer className="h-4 w-4 text-slate-600" />
+                  Imprimer
+                </button>
+                <button
+                  type="button"
+                  disabled={downloadingPdf || !data?.settings}
+                  onClick={async () => {
+                    if (!data?.settings) return;
+                    setDownloadingPdf(true);
+                    try {
+                      const filename = await downloadClientFichePdf({ settings: data.settings, dossier });
+                      pushToast('success', `PDF téléchargé : ${filename}`);
+                    } catch {
+                      pushToast('error', 'Erreur lors de la génération PDF. Utilisez le bouton Imprimer.');
+                    } finally {
+                      setDownloadingPdf(false);
+                    }
+                  }}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-50 px-4 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 whitespace-nowrap shrink-0"
+                >
+                  <Download className="h-4 w-4" />
+                  {downloadingPdf ? 'PDF...' : 'Garder en PDF'}
+                </button>
+              </div>
             </div>
 
             <h2 className="mt-6 font-display text-base font-bold text-slate-900">Historique du traitement</h2>
@@ -181,6 +226,8 @@ export const SuiviDossierPage: React.FC = () => {
                 </li>
               ))}
             </ul>
+
+            <ClientFicheModal open={ficheOpen} onClose={() => setFicheOpen(false)} dossier={dossier} />
           </div>
         )}
       </div>

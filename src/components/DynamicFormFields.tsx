@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
-import { ArrowRight, Check, Copy, FileText, Share2, Trash2, Upload, WifiOff } from 'lucide-react';
+import { ArrowRight, Check, Copy, Download, Eye, FileText, Share2, Trash2, Upload, WifiOff } from 'lucide-react';
 import type { CustomFormField } from '../types/lomakrev';
 import { compressImageFile } from '../lib/offlineSync';
-import { buildFacebookShareUrl, buildWhatsAppShareUrl } from '../lib/pdfPrint';
+import {
+  buildFacebookShareUrl,
+  buildWhatsAppShareUrl,
+  downloadClientFichePdf,
+  type ClientFicheDossier,
+} from '../lib/pdfPrint';
 import { useApp } from '../context/AppContext';
 import { OfficeAwareSelect } from './DualSelectInput';
+import { ClientFicheModal } from './ClientFicheModal';
 
 export function validateRdcPhone(value: string): boolean {
   const clean = value.replace(/[\s\-().]/g, '');
@@ -363,14 +369,7 @@ export const CustomFieldsRenderer: React.FC<{
 export const SubmissionSuccessCard: React.FC<{
   offline?: boolean;
   localId?: string;
-  dossier?: {
-    reference: string;
-    applicantName: string;
-    status: string;
-    eligibilityStatus?: string | null;
-    eligibilityReason?: string | null;
-    autoMessage?: string | null;
-  };
+  dossier?: ClientFicheDossier;
   title?: string;
   bulletPoints?: string[];
   smsPreview?: string;
@@ -388,8 +387,23 @@ export const SubmissionSuccessCard: React.FC<{
   resetLabel = 'Retour',
   onReset,
 }) => {
-  const { navigate, data } = useApp();
+  const { navigate, data, pushToast } = useApp();
+  const [ficheOpen, setFicheOpen] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const autoSmsText = smsPreview || dossier?.autoMessage || '';
+
+  const handleDownloadPdf = async () => {
+    if (!dossier || !data?.settings) return;
+    setDownloadingPdf(true);
+    try {
+      const filename = await downloadClientFichePdf({ settings: data.settings, dossier });
+      pushToast('success', `PDF téléchargé : ${filename}`);
+    } catch {
+      pushToast('error', 'Impossible de générer le PDF. Utilisez Visualiser la fiche client puis Imprimer.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   return (
     <div
@@ -453,25 +467,48 @@ export const SubmissionSuccessCard: React.FC<{
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap gap-3">
+      <div className="mt-5 flex flex-wrap gap-2.5">
         {!offline && dossier?.reference && (
-          <button
-            type="button"
-            onClick={() => navigate(`/suivi?ref=${encodeURIComponent(dossier.reference)}`)}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#D90A14] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#b80811]"
-          >
-            Suivre mon dossier
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => navigate(`/suivi?ref=${encodeURIComponent(dossier.reference)}`)}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#D90A14] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#b80811] whitespace-nowrap shrink-0"
+            >
+              Suivre mon dossier
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setFicheOpen(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50 whitespace-nowrap shrink-0"
+            >
+              <Eye className="h-4 w-4 text-slate-600" />
+              Visualiser la fiche client
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-50 px-4 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:opacity-60 whitespace-nowrap shrink-0"
+            >
+              <Download className="h-4 w-4" />
+              {downloadingPdf ? 'PDF...' : 'Garder en PDF'}
+            </button>
+          </>
         )}
         <button
           type="button"
           onClick={() => (onReset ? onReset() : navigate('/'))}
-          className="inline-flex h-10 items-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="inline-flex h-10 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 whitespace-nowrap shrink-0"
         >
           {resetLabel}
         </button>
       </div>
+
+      {!offline && dossier && (
+        <ClientFicheModal open={ficheOpen} onClose={() => setFicheOpen(false)} dossier={dossier} />
+      )}
     </div>
   );
 };
