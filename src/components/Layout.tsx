@@ -84,6 +84,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [orderResult, setOrderResult] = useState<any>(null);
 
   const settings = data?.settings;
+  const footerBg = settings?.footerBgImageUrl ?? '/src/assets/images/footer_laptop_studio_1795528399505.jpg';
   const copy = t(lang);
   const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
   const cartTotalUsd = cart.reduce((sum, i) => sum + i.product.priceUsd * i.qty, 0);
@@ -346,18 +347,22 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Main Content */}
       <main className="flex-1">{children}</main>
 
-      {/* Institutional Footer in Lomakrev Red, Yellow & White with Professional Backdrop */}
-      <footer className="no-print relative overflow-hidden border-t-4 border-[#FBBF24] bg-[#2C0205] text-white">
-        <img
-          src="/src/assets/images/footer_laptop_studio_1795448543304.jpg"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-85 brightness-100"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#4A0308]/62 via-[#63050B]/52 to-[#3B0307]/62"
-        />
+      {/* Institutional Footer in Lomakrev Red, Yellow & White */}
+      <footer className={`no-print relative overflow-hidden border-t-4 border-[#FBBF24] text-white ${footerBg ? 'bg-[#2C0205]' : 'bg-[#C40912]'}`}>
+        {footerBg && (
+          <>
+            <img
+              src={footerBg}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-85 brightness-100"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#4A0308]/62 via-[#63050B]/52 to-[#3B0307]/62"
+            />
+          </>
+        )}
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-10 pb-20 sm:px-6 md:py-12 md:pb-16 lg:py-16">
           <div className="grid gap-8 sm:gap-10 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-4">

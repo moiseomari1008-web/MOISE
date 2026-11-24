@@ -241,11 +241,13 @@ export const AProposPage: React.FC = () => {
   if (!data) return null;
   const { settings } = data;
 
+  const aboutPhoto = settings.aboutImageUrl || settings.heroImageUrl;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">
       <Breadcrumbs items={[{ label: 'À propos' }]} />
       <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
-        <div className="lg:col-span-6">
+        <div className={aboutPhoto ? 'lg:col-span-6' : 'lg:col-span-12 max-w-3xl'}>
           <p className="text-xs font-semibold uppercase tracking-wider text-[#D90A14]">À propos de {settings.legalName}</p>
           <h1 className="mt-2 font-display text-3xl font-extrabold text-slate-900 sm:text-4xl text-balance">
             {settings.promise}
@@ -266,9 +268,11 @@ export const AProposPage: React.FC = () => {
             </button>
           </div>
         </div>
-        <div className="lg:col-span-6">
-          <PhotoFrame src={settings.aboutImageUrl || settings.heroImageUrl} alt="Équipe et siège LOMAKREV GROUP à Gombe" aspectClass="aspect-[4/3]" className="rounded-xl border border-slate-200" priority />
-        </div>
+        {aboutPhoto && (
+          <div className="lg:col-span-6">
+            <PhotoFrame src={aboutPhoto} alt="Équipe et siège LOMAKREV GROUP à Gombe" aspectClass="aspect-[4/3]" className="rounded-xl border border-slate-200" priority />
+          </div>
+        )}
       </div>
     </div>
   );

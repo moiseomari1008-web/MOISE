@@ -34,7 +34,7 @@ export const TechCatalogPage: React.FC = () => {
 
   const brands = ['Tous', ...Array.from(new Set(products.map((p) => p.brand)))];
   const rams = ['Tous', ...Array.from(new Set(products.map((p) => p.ram)))];
-  const conditions = ['Tous', 'Neuf', 'Quasi neuf', 'Reconditionné'];
+  const conditions = ['Tous', ...Array.from(new Set(['Neuf', 'Quasi neuf', 'Reconditionné', ...products.map((p) => p.condition).filter(Boolean)]))];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
@@ -171,7 +171,9 @@ export const TechCatalogPage: React.FC = () => {
               key={product.id}
               className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-transform hover:-translate-y-0.5"
             >
-              <PhotoFrame src={product.images[0]} alt={product.model} aspectClass="aspect-[4/3]" className="border-b border-slate-100" />
+              {product.images?.[0] && (
+                <PhotoFrame src={product.images[0]} alt={product.model} aspectClass="aspect-[4/3]" className="border-b border-slate-100" />
+              )}
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span>{product.brand}</span>
@@ -254,33 +256,35 @@ export const TechProductDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
       <Breadcrumbs items={[{ label: 'Lomakrev Tech', to: '/tech' }, { label: product.model }]} />
 
       <div className="grid gap-10 lg:grid-cols-12">
-        <div className="space-y-4 lg:col-span-7">
-          <Product3DShowcase
-            src={product.images[activeImage] || product.images[0]}
-            alt={product.model}
-            brand={product.brand}
-            badgeText={product.availability}
-            aspectClass="aspect-[4/3]"
-            className="rounded-2xl border border-[#F4B400]/50"
-            priority
-          />
-          {product.images.length > 1 && (
-            <div className="flex flex-wrap gap-2.5 sm:gap-3">
-              {product.images.map((img, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setActiveImage(i)}
-                  className={`h-16 w-24 overflow-hidden rounded-lg border-2 sm:h-20 sm:w-28 ${activeImage === i ? 'border-[#D90A14]' : 'border-slate-200'}`}
-                >
-                  <img src={img} alt={`${product.model} vue ${i + 1}`} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {product.images.length > 0 && (
+          <div className="space-y-4 lg:col-span-7">
+            <Product3DShowcase
+              src={product.images[activeImage] || product.images[0]}
+              alt={product.model}
+              brand={product.brand}
+              badgeText={product.availability}
+              aspectClass="aspect-[4/3]"
+              className="rounded-2xl border border-[#F4B400]/50"
+              priority
+            />
+            {product.images.length > 1 && (
+              <div className="flex flex-wrap gap-2.5 sm:gap-3">
+                {product.images.map((img, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setActiveImage(i)}
+                    className={`h-16 w-24 overflow-hidden rounded-lg border-2 sm:h-20 sm:w-28 ${activeImage === i ? 'border-[#D90A14]' : 'border-slate-200'}`}
+                  >
+                    <img src={img} alt={`${product.model} vue ${i + 1}`} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        <div className="lg:col-span-5">
+        <div className={product.images.length > 0 ? 'lg:col-span-5' : 'lg:col-span-8 lg:col-start-3'}>
           <div className="rounded-xl border border-[#F4B400]/50 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <span className="font-semibold text-[#D90A14]">{product.brand}</span>

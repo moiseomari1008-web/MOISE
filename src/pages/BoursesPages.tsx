@@ -14,6 +14,7 @@ import {
 } from '../components/DynamicFormFields';
 import { formatDateFr } from '../lib/pdfPrint';
 import { clearFormDraft, loadFormDraft, saveFormDraft } from '../lib/offlineSync';
+import { OfficeAwareSelect } from '../components/DualSelectInput';
 import type { ScholarshipCampaign } from '../types/lomakrev';
 
 export function isCampaignOpen(camp: ScholarshipCampaign): boolean {
@@ -46,15 +47,17 @@ export const BoursesHomePage: React.FC = () => {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
       <Breadcrumbs items={[{ label: 'Programme de Bourses' }]} />
 
-      {/* Prominent 1st Edition Family Photo at top of pole page */}
+      {/* Top pole card (family photo shown only when added by admin) */}
       <div className="overflow-hidden rounded-2xl border border-[#F4B400]/50 bg-white">
-        <PhotoFrame
-          src={settings.boursesFamilyImageUrl}
-          alt="Photo de famille de la première édition du Programme de Bourses LOMAKREV GROUP"
-          aspectClass="aspect-[16/7]"
-          priority
-          caption="Première édition — Photo de famille des lauréats et de l’équipe pédagogique LOMAKREV GROUP"
-        />
+        {settings.boursesFamilyImageUrl && (
+          <PhotoFrame
+            src={settings.boursesFamilyImageUrl}
+            alt="Photo de famille du Programme de Bourses LOMAKREV GROUP"
+            aspectClass="aspect-[16/7]"
+            priority
+            caption="Photo de famille des lauréats et de l’équipe pédagogique LOMAKREV GROUP"
+          />
+        )}
         <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-8">
             <p className="text-xs font-bold uppercase tracking-wider text-[#D90A14]">Pôle 4 · Programme de Bourses</p>
@@ -106,7 +109,9 @@ export const BoursesHomePage: React.FC = () => {
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           {openCampaigns.map((camp) => (
             <article key={camp.id} className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <PhotoFrame src={camp.imageUrl} alt={camp.title} aspectClass="aspect-[16/9]" className="border-b border-slate-100" />
+              {camp.imageUrl && (
+                <PhotoFrame src={camp.imageUrl} alt={camp.title} aspectClass="aspect-[16/9]" className="border-b border-slate-100" />
+              )}
               <div className="flex flex-1 flex-col p-6">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span className="font-semibold text-emerald-700">Inscriptions ouvertes</span>
@@ -231,7 +236,9 @@ export const BourseCampaignDetailPage: React.FC<{ slug: string }> = ({ slug }) =
       )}
 
       <div className="overflow-hidden rounded-2xl border border-[#F4B400]/50 bg-white">
-        <PhotoFrame src={camp.imageUrl} alt={camp.title} aspectClass="aspect-[16/7]" priority />
+        {camp.imageUrl && (
+          <PhotoFrame src={camp.imageUrl} alt={camp.title} aspectClass="aspect-[16/7]" priority />
+        )}
         <div className="p-6 sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -604,21 +611,25 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
               <div className="space-y-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">Campagne *</label>
-                  <select value={formState.campaignSlug} onChange={(e) => updateField('campaignSlug', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base">
-                    {openCampaigns.map((c) => (
-                      <option key={c.slug} value={c.slug}>
-                        {c.title}
-                      </option>
-                    ))}
-                  </select>
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_bourse_campaign"
+                    value={formState.campaignSlug}
+                    onChange={(val) => updateField('campaignSlug', val)}
+                    options={openCampaigns.map((c) => ({ value: c.slug, label: c.title }))}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">Formation souhaitée *</label>
-                  <select value={formState.formationChoisie || campaign.formations[0]} onChange={(e) => updateField('formationChoisie', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base">
-                    {campaign.formations.map((f) => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
-                  </select>
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_bourse_formation"
+                    value={formState.formationChoisie || campaign.formations[0]}
+                    onChange={(val) => updateField('formationChoisie', val)}
+                    options={campaign.formations}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">
@@ -643,7 +654,7 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
                     ))}
                   </div>
                 </div>
-                <CustomFieldsRenderer fields={customFields} step={1} values={formState} onChange={updateField} />
+                <CustomFieldsRenderer fields={customFields} step={1} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
               </div>
             )}
 
@@ -654,10 +665,14 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
                   <input type="text" placeholder="Postnom" value={formState.postnom} onChange={(e) => updateField('postnom', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                   <input type="text" placeholder="Prénom *" value={formState.prenom} onChange={(e) => updateField('prenom', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                 </div>
-                <select value={formState.sexe} onChange={(e) => updateField('sexe', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                  <option value="Masculin">Masculin</option>
-                  <option value="Féminin">Féminin</option>
-                </select>
+                <OfficeAwareSelect
+                  officeMode={Boolean(enteredByAgent)}
+                  fieldKey="office_sexe"
+                  value={formState.sexe}
+                  onChange={(val) => updateField('sexe', val)}
+                  options={['Masculin', 'Féminin']}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                />
                 <RdcPhoneInput
                   phone={formState.phone}
                   onPhoneChange={(v) => updateField('phone', v)}
@@ -672,7 +687,7 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
                   <input type="text" placeholder="Ville *" value={formState.ville} onChange={(e) => updateField('ville', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                   <input type="text" placeholder="Province *" value={formState.province} onChange={(e) => updateField('province', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                 </div>
-                <CustomFieldsRenderer fields={customFields} step={2} values={formState} onChange={updateField} />
+                <CustomFieldsRenderer fields={customFields} step={2} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
               </div>
             )}
 
@@ -681,12 +696,14 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Niveau d’études *</label>
-                    <select value={formState.niveauEtudes} onChange={(e) => updateField('niveauEtudes', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Secondaire / Diplôme d’État</option>
-                      <option>Graduat / Licence</option>
-                      <option>Master / Doctorat</option>
-                      <option>Formation professionnelle</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_niveau_etudes"
+                      value={formState.niveauEtudes}
+                      onChange={(val) => updateField('niveauEtudes', val)}
+                      options={['Secondaire / Diplôme d’État', 'Graduat / Licence', 'Master / Doctorat', 'Formation professionnelle']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Établissement ou filière</label>
@@ -696,39 +713,52 @@ export const BoursePostulerPage: React.FC<{ enteredByAgent?: string | null; onDo
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Situation actuelle *</label>
-                    <select value={formState.situation} onChange={(e) => updateField('situation', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Sans emploi</option>
-                      <option>Étudiant</option>
-                      <option>Employé / Salarié</option>
-                      <option>Entrepreneur / Petit commerçant</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_situation"
+                      value={formState.situation}
+                      onChange={(val) => updateField('situation', val)}
+                      options={['Sans emploi', 'Étudiant', 'Employé / Salarié', 'Entrepreneur / Petit commerçant']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Déjà client Lomakrev ?</label>
-                    <select value={formState.clientLomakrev} onChange={(e) => updateField('clientLomakrev', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Non</option>
-                      <option>Oui</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_oui_non"
+                      value={formState.clientLomakrev}
+                      onChange={(val) => updateField('clientLomakrev', val)}
+                      options={['Non', 'Oui']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Avez-vous accès à un ordinateur ?</label>
-                    <select value={formState.accesOrdinateur} onChange={(e) => updateField('accesOrdinateur', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Non</option>
-                      <option>Oui</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_oui_non"
+                      value={formState.accesOrdinateur}
+                      onChange={(val) => updateField('accesOrdinateur', val)}
+                      options={['Non', 'Oui']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Niveau en informatique</label>
-                    <select value={formState.niveauInfo} onChange={(e) => updateField('niveauInfo', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Débutant</option>
-                      <option>Intermédiaire</option>
-                      <option>Avancé</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_niveau_info"
+                      value={formState.niveauInfo}
+                      onChange={(val) => updateField('niveauInfo', val)}
+                      options={['Débutant', 'Intermédiaire', 'Avancé']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                 </div>
-                <CustomFieldsRenderer fields={customFields} step={3} values={formState} onChange={updateField} />
+                <CustomFieldsRenderer fields={customFields} step={3} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
               </div>
             )}
 

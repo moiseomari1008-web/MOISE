@@ -52,6 +52,7 @@ import {
 import { AcademieInscriptionPage } from './AcademiePages';
 import { BoursePostulerPage } from './BoursesPages';
 import { MaintenanceDevisPage, MaintenanceInterventionPage } from './MaintenancePages';
+import { DualSelectInput, SelectOptionsProvider } from '../components/DualSelectInput';
 import type {
   AdminNotification,
   AuditLogEntry,
@@ -59,6 +60,7 @@ import type {
   Dossier,
   Formation,
   FormDefinition,
+  MaintenanceService,
   ScholarshipCampaign,
   ScholarshipCriterion,
   SitePhotoItem,
@@ -81,7 +83,7 @@ type AdminTab =
   | 'security'
   | 'profile';
 
-const ROLE_LABELS: Record<UserRole, string> = {
+const ROLE_LABELS: Record<string, string> = {
   DIRECTION: 'Direction / Administrateur',
   COMMERCIAL_TECH: 'Commercial Tech',
   RESPONSABLE_ACADEMIE: 'Responsable Académie',
@@ -144,6 +146,7 @@ export const AdminPage: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Partial<TechProduct> | null>(null);
   const [editingFormation, setEditingFormation] = useState<Formation | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<ScholarshipCampaign | null>(null);
+  const [editingService, setEditingService] = useState<MaintenanceService | null>(null);
   const [newPhoto, setNewPhoto] = useState<Partial<SitePhotoItem>>({ pole: 'bourses', edition: 'Deuxième édition — 2027', caption: '', consentVerified: true, url: '' });
 
   // Form builder state
@@ -1476,6 +1479,55 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const handleSaveService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingService) return;
+    const res = await apiFetch('/api/admin/services', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(editingService),
+    });
+    if (res.ok) {
+      pushToast('success', 'Service Top Maintenance mis à jour.');
+      setEditingService(null);
+      refreshData();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      pushToast('error', err.error || 'Erreur lors de l’enregistrement du service.');
+    }
+  };
+
+  const handleQuickEntityPhotoUpload = async (
+    kind: 'formation' | 'campaign' | 'service' | 'gallery',
+    entity: Formation | ScholarshipCampaign | MaintenanceService | SitePhotoItem,
+    file: File | null,
+    clearPhoto = false
+  ) => {
+    if (!file && !clearPhoto) return;
+    const url = clearPhoto ? '' : await compressImageFile(file!);
+    const endpoint =
+      kind === 'formation'
+        ? '/api/admin/formations'
+        : kind === 'campaign'
+        ? '/api/admin/campaigns'
+        : kind === 'service'
+        ? '/api/admin/services'
+        : '/api/admin/photos';
+    const payload = kind === 'gallery' ? { ...(entity as SitePhotoItem), url } : { ...entity, imageUrl: url };
+    const res = await apiFetch(endpoint, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      pushToast('success', clearPhoto ? 'Photo retirée du site.' : 'Photo mise à jour et publiée sur le site.');
+      refreshData();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      pushToast('error', err.error || 'Impossible de mettre à jour la photo.');
+    }
+  };
+
   const handleAddPhoto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPhoto.url) {
@@ -1637,8 +1689,12 @@ export const AdminPage: React.FC = () => {
   };
 
   const filteredDossiers = dossiers.filter((d) => {
-    if (poleFilter !== 'all' && d.pole !== poleFilter) return false;
-    if (statusFilter !== 'all' && !d.status.toLowerCase().includes(statusFilter.toLowerCase())) return false;
+    if (poleFilter && poleFilter !== 'all') {
+      const pf = poleFilter.toLowerCase();
+      const matchesPole = d.pole.toLowerCase() === pf || d.pole.toLowerCase().includes(pf) || d.type.toLowerCase() === pf;
+      if (!matchesPole) return false;
+    }
+    if (statusFilter && statusFilter !== 'all' && !d.status.toLowerCase().includes(statusFilter.toLowerCase())) return false;
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       return (
@@ -1653,6 +1709,7 @@ export const AdminPage: React.FC = () => {
   const technicians = usersList.filter((u) => u.role === 'TECHNICIEN' && u.active);
 
   return (
+    <SelectOptionsProvider token={token || pending2FATokenRef.current}>
     <div className="flex min-h-screen overflow-x-clip bg-[#FFFDF5]">
       {sidebarOpen && (
         <div
@@ -2011,23 +2068,39 @@ export const AdminPage: React.FC = () => {
                   )}
                 </div>
                 {!isTechOnly && (
-                  <select value={poleFilter} onChange={(e) => setPoleFilter(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
-                    <option value="all">Tous les pôles</option>
-                    <option value="tech">Tech (Commandes)</option>
-                    <option value="academie">Académie</option>
-                    <option value="bourses">Bourses</option>
-                    <option value="maintenance">Top Maintenance</option>
-                    <option value="contact">Contact</option>
-                  </select>
+                  <DualSelectInput
+                    fieldKey="dossier_pole_filter"
+                    value={poleFilter}
+                    onChange={(val) => setPoleFilter(val || 'all')}
+                    options={[
+                      { value: 'all', label: 'Tous les pôles' },
+                      { value: 'tech', label: 'Tech (Commandes)' },
+                      { value: 'academie', label: 'Académie' },
+                      { value: 'bourses', label: 'Bourses' },
+                      { value: 'maintenance', label: 'Top Maintenance' },
+                      { value: 'contact', label: 'Contact' },
+                    ]}
+                    placeholder="Pôle (sélection ou saisie)"
+                    className="w-full sm:w-48"
+                    inputClassName="text-sm"
+                  />
                 )}
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
-                  <option value="all">Tous les statuts</option>
-                  <option value="nouvelle">Nouvelle / Reçue</option>
-                  <option value="éligible">Éligible</option>
-                  <option value="approuvée">Approuvée</option>
-                  <option value="planifiée">Planifiée</option>
-                  <option value="terminée">Terminée</option>
-                </select>
+                <DualSelectInput
+                  fieldKey="dossier_status_filter"
+                  value={statusFilter}
+                  onChange={(val) => setStatusFilter(val || 'all')}
+                  options={[
+                    { value: 'all', label: 'Tous les statuts' },
+                    { value: 'nouvelle', label: 'Nouvelle / Reçue' },
+                    { value: 'éligible', label: 'Éligible' },
+                    { value: 'approuvée', label: 'Approuvée' },
+                    { value: 'planifiée', label: 'Planifiée' },
+                    { value: 'terminée', label: 'Terminée' },
+                  ]}
+                  placeholder="Statut (sélection ou saisie)"
+                  className="w-full sm:w-48"
+                  inputClassName="text-sm"
+                />
                 {batchSelection.length > 0 && ['DIRECTION', 'RESPONSABLE_BOURSES'].includes(user.role) && (
                   <button
                     type="button"
@@ -2341,18 +2414,21 @@ export const AdminPage: React.FC = () => {
                         <div className="space-y-3 rounded-xl border border-slate-200 p-4">
                           <h4 className="text-sm font-bold text-slate-900">Affectation & carnet d’entretien</h4>
                           {['DIRECTION', 'TOP_MAINTENANCE'].includes(user.role) && (
-                            <select
+                            <DualSelectInput
+                              fieldKey="dossier_technician"
                               value={selectedDossier.assignedToId || ''}
-                              onChange={(e) => handleUpdateDossier(selectedDossier.id, { assignedToId: e.target.value })}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs"
-                            >
-                              <option value="">-- Affecter un technicien --</option>
-                              {technicians.map((t) => (
-                                <option key={t.id} value={t.id}>
-                                  {t.name}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(val, lbl) => handleUpdateDossier(selectedDossier.id, { assignedToId: val, assignedToName: lbl || val })}
+                              options={[
+                                { value: '', label: '-- Non affecté --' },
+                                ...technicians.map((t) => ({ value: t.id, label: t.name })),
+                                ...(selectedDossier.assignedToId && selectedDossier.assignedToName && !technicians.some((t) => t.id === selectedDossier.assignedToId)
+                                  ? [{ value: selectedDossier.assignedToId, label: selectedDossier.assignedToName }]
+                                  : []),
+                              ]}
+                              allowEmpty
+                              placeholder="Sélectionner ou saisir un technicien..."
+                              inputClassName="text-xs"
+                            />
                           )}
                           <textarea
                             rows={2}
@@ -2529,6 +2605,7 @@ export const AdminPage: React.FC = () => {
                   { id: 'tech', label: 'Ordinateurs Tech' },
                   { id: 'academie', label: 'Formations & Sessions' },
                   { id: 'bourses', label: 'Campagnes & Critères' },
+                  { id: 'maintenance', label: 'Services Maintenance' },
                   { id: 'photos', label: 'Galerie Photos par Édition' },
                 ].map((sub) => (
                   <button
@@ -2663,27 +2740,25 @@ export const AdminPage: React.FC = () => {
                           </div>
                           <div>
                             <label className="mb-1 block text-xs font-semibold text-slate-600">Disponibilité</label>
-                            <select
+                            <DualSelectInput
+                              fieldKey="product_availability"
                               value={editingProduct.availability || 'En stock'}
-                              onChange={(e) => setEditingProduct({ ...editingProduct, availability: e.target.value as any })}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                            >
-                              <option>En stock</option>
-                              <option>Sur commande</option>
-                              <option>Épuisé</option>
-                            </select>
+                              onChange={(val) => setEditingProduct({ ...editingProduct, availability: val })}
+                              options={['En stock', 'Sur commande', 'Épuisé']}
+                              placeholder="Disponibilité..."
+                              inputClassName="text-sm"
+                            />
                           </div>
                           <div>
                             <label className="mb-1 block text-xs font-semibold text-slate-600">État</label>
-                            <select
+                            <DualSelectInput
+                              fieldKey="product_condition"
                               value={editingProduct.condition || 'Quasi neuf'}
-                              onChange={(e) => setEditingProduct({ ...editingProduct, condition: e.target.value as any })}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                            >
-                              <option>Neuf</option>
-                              <option>Quasi neuf</option>
-                              <option>Reconditionné</option>
-                            </select>
+                              onChange={(val) => setEditingProduct({ ...editingProduct, condition: val })}
+                              options={['Neuf', 'Quasi neuf', 'Reconditionné']}
+                              placeholder="État..."
+                              inputClassName="text-sm"
+                            />
                           </div>
                           <div className="sm:col-span-2">
                             <label className="mb-1 block text-xs font-semibold text-slate-600">Photo(s) de l’article</label>
@@ -2889,9 +2964,60 @@ export const AdminPage: React.FC = () => {
                   {editingFormation && (
                     <form onSubmit={handleSaveFormation} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
                       <h4 className="font-bold text-slate-900">Éditer : {editingFormation.title}</h4>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <input type="text" value={editingFormation.title} onChange={(e) => setEditingFormation({ ...editingFormation, title: e.target.value })} className="rounded border border-slate-300 px-3 py-2 text-sm" />
-                        <input type="number" value={editingFormation.durationHours} onChange={(e) => setEditingFormation({ ...editingFormation, durationHours: Number(e.target.value) })} className="rounded border border-slate-300 px-3 py-2 text-sm" />
+                      <div className="grid gap-4 sm:grid-cols-12">
+                        <div className="space-y-3 sm:col-span-7">
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-slate-600">Titre de la formation</label>
+                            <input type="text" value={editingFormation.title} onChange={(e) => setEditingFormation({ ...editingFormation, title: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-slate-600">Durée (heures)</label>
+                            <input type="number" value={editingFormation.durationHours} onChange={(e) => setEditingFormation({ ...editingFormation, durationHours: Number(e.target.value) })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-slate-600">Résumé affiché sur la carte</label>
+                            <textarea rows={2} value={editingFormation.summary} onChange={(e) => setEditingFormation({ ...editingFormation, summary: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                          </div>
+                        </div>
+                        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-5">
+                          <p className="text-xs font-bold text-slate-700">Photo de la formation</p>
+                          {editingFormation.imageUrl ? (
+                            <img src={editingFormation.imageUrl} alt={editingFormation.title} className="h-32 w-full rounded border border-slate-200 bg-white object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="flex h-32 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-slate-300 bg-white text-slate-400">
+                              <ImageIcon className="h-6 w-6" />
+                              <span className="text-[11px]">Aucune photo</span>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100">
+                              <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                              <span>{editingFormation.imageUrl ? 'Changer la photo' : 'Ajouter une photo'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const url = await compressImageFile(file);
+                                    setEditingFormation({ ...editingFormation, imageUrl: url });
+                                  }
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                            {editingFormation.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingFormation({ ...editingFormation, imageUrl: '' })}
+                                className="rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#D90A14] hover:bg-red-50"
+                              >
+                                Retirer
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <p className="mb-2 text-xs font-bold uppercase text-slate-500">Sessions (dates, horaires, prix, ouverture 2027)</p>
@@ -2946,13 +3072,37 @@ export const AdminPage: React.FC = () => {
                   <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
                     {data.formations.map((f) => (
                       <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                        <div>
-                          <p className="font-bold text-slate-900">{f.title}</p>
-                          <p className="text-xs text-slate-500">{f.durationHours} h · {f.sessions.filter((s) => s.isOpen).length} session(s) ouverte(s)</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          {f.imageUrl ? (
+                            <img src={f.imageUrl} alt={f.title} className="h-14 w-20 shrink-0 rounded-lg border border-slate-200 object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+                              <ImageIcon className="h-5 w-5" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900">{f.title}</p>
+                            <p className="text-xs text-slate-500">{f.durationHours} h · {f.sessions.filter((s) => s.isOpen).length} session(s) ouverte(s)</p>
+                          </div>
                         </div>
-                        <button type="button" onClick={() => setEditingFormation(f)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold">
-                          Gérer / Ouvrir session
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-3 py-1.5 text-xs font-semibold text-[#78350F] hover:bg-[#FEF3C7]">
+                            <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                            <span>Changer photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                handleQuickEntityPhotoUpload('formation', f, e.target.files?.[0] || null);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          <button type="button" onClick={() => setEditingFormation(f)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold">
+                            Gérer / Ouvrir session
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2964,25 +3114,75 @@ export const AdminPage: React.FC = () => {
                   {editingCampaign && (
                     <form onSubmit={handleSaveCampaign} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
                       <h4 className="font-bold text-slate-900">Campagne & Critères : {editingCampaign.title}</h4>
-                      <div className="grid gap-3 sm:grid-cols-3 text-xs">
-                        <div>
-                          <label className="block text-slate-600">Titre</label>
-                          <input type="text" value={editingCampaign.title} onChange={(e) => setEditingCampaign({ ...editingCampaign, title: e.target.value })} className="mt-1 w-full rounded border px-2.5 py-2" />
-                        </div>
-                        <div>
-                          <label className="block text-slate-600">Âge min / Places</label>
-                          <div className="mt-1 flex gap-2">
-                            <input type="number" value={editingCampaign.minAge} onChange={(e) => setEditingCampaign({ ...editingCampaign, minAge: Number(e.target.value) })} className="w-1/2 rounded border px-2 py-2" />
-                            <input type="number" value={editingCampaign.places} onChange={(e) => setEditingCampaign({ ...editingCampaign, places: Number(e.target.value) })} className="w-1/2 rounded border px-2 py-2" />
+                      <div className="grid gap-4 sm:grid-cols-12 text-xs">
+                        <div className="grid gap-3 sm:grid-cols-2 sm:col-span-7">
+                          <div className="sm:col-span-2">
+                            <label className="block text-slate-600">Titre</label>
+                            <input type="text" value={editingCampaign.title} onChange={(e) => setEditingCampaign({ ...editingCampaign, title: e.target.value })} className="mt-1 w-full rounded border px-2.5 py-2" />
+                          </div>
+                          <div>
+                            <label className="block text-slate-600">Âge min / Places</label>
+                            <div className="mt-1 flex gap-2">
+                              <input type="number" value={editingCampaign.minAge} onChange={(e) => setEditingCampaign({ ...editingCampaign, minAge: Number(e.target.value) })} className="w-1/2 rounded border px-2 py-2" />
+                              <input type="number" value={editingCampaign.places} onChange={(e) => setEditingCampaign({ ...editingCampaign, places: Number(e.target.value) })} className="w-1/2 rounded border px-2 py-2" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-slate-600">Statut manuel</label>
+                            <div className="mt-1">
+                              <DualSelectInput
+                                fieldKey="campaign_status_override"
+                                value={editingCampaign.statusOverride || 'auto'}
+                                onChange={(val) => setEditingCampaign({ ...editingCampaign, statusOverride: val as any })}
+                                options={[
+                                  { value: 'auto', label: 'Automatique (selon dates)' },
+                                  { value: 'open', label: 'Forcer Ouverte' },
+                                  { value: 'closed', label: 'Forcer Clôturée' },
+                                ]}
+                                placeholder="Statut manuel..."
+                                inputClassName="text-xs"
+                              />
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-slate-600">Statut manuel</label>
-                          <select value={editingCampaign.statusOverride || 'auto'} onChange={(e) => setEditingCampaign({ ...editingCampaign, statusOverride: e.target.value as any })} className="mt-1 w-full rounded border bg-white px-2 py-2">
-                            <option value="auto">Automatique (selon dates)</option>
-                            <option value="open">Forcer Ouverte</option>
-                            <option value="closed">Forcer Clôturée</option>
-                          </select>
+                        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-5">
+                          <p className="font-bold text-slate-700">Photo de la campagne</p>
+                          {editingCampaign.imageUrl ? (
+                            <img src={editingCampaign.imageUrl} alt={editingCampaign.title} className="h-32 w-full rounded border border-slate-200 bg-white object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="flex h-32 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-slate-300 bg-white text-slate-400">
+                              <ImageIcon className="h-6 w-6" />
+                              <span className="text-[11px]">Aucune photo</span>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100">
+                              <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                              <span>{editingCampaign.imageUrl ? 'Changer la photo' : 'Ajouter une photo'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const url = await compressImageFile(file);
+                                    setEditingCampaign({ ...editingCampaign, imageUrl: url });
+                                  }
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                            {editingCampaign.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingCampaign({ ...editingCampaign, imageUrl: '' })}
+                                className="rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#D90A14] hover:bg-red-50"
+                              >
+                                Retirer
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -2991,11 +3191,23 @@ export const AdminPage: React.FC = () => {
                         {editingCampaign.criteria.map((c, idx) => (
                           <div key={c.id} className="mb-2 flex flex-wrap items-center gap-2 text-xs">
                             <input type="text" value={c.label} onChange={(e) => { const next = [...editingCampaign.criteria]; next[idx].label = e.target.value; setEditingCampaign({ ...editingCampaign, criteria: next }); }} className="flex-1 rounded border px-2.5 py-1.5" />
-                            <select value={c.type} onChange={(e) => { const next = [...editingCampaign.criteria]; next[idx].type = e.target.value as any; setEditingCampaign({ ...editingCampaign, criteria: next }); }} className="rounded border bg-white px-2 py-1.5">
-                              <option value="eliminatoire">Éliminatoire</option>
-                              <option value="automatique">Noté automatiquement</option>
-                              <option value="equipe">Noté par l’équipe</option>
-                            </select>
+                            <DualSelectInput
+                              fieldKey="criterion_type"
+                              value={c.type}
+                              onChange={(val) => {
+                                const next = [...editingCampaign.criteria];
+                                next[idx].type = val as any;
+                                setEditingCampaign({ ...editingCampaign, criteria: next });
+                              }}
+                              options={[
+                                { value: 'eliminatoire', label: 'Éliminatoire' },
+                                { value: 'automatique', label: 'Noté automatiquement' },
+                                { value: 'equipe', label: 'Noté par l’équipe' },
+                              ]}
+                              placeholder="Type de critère..."
+                              className="w-44"
+                              inputClassName="py-1.5 text-xs"
+                            />
                             <input type="number" value={c.points || c.maxScore || 0} onChange={(e) => { const next = [...editingCampaign.criteria]; next[idx].points = Number(e.target.value); next[idx].maxScore = Number(e.target.value); setEditingCampaign({ ...editingCampaign, criteria: next }); }} className="w-20 rounded border px-2 py-1.5 font-mono-tabular" />
                             <button type="button" onClick={() => setEditingCampaign({ ...editingCampaign, criteria: editingCampaign.criteria.filter((_, i) => i !== idx) })} className="text-[#D90A14]">
                               <Trash2 className="h-4 w-4" />
@@ -3024,13 +3236,151 @@ export const AdminPage: React.FC = () => {
                   <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
                     {data.campaigns.map((c) => (
                       <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                        <div>
-                          <p className="font-bold text-slate-900">{c.title}</p>
-                          <p className="text-xs text-slate-500">{c.places} places · Clôture {formatDateFr(c.closeDate)} · {c.criteria.length} critère(s)</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          {c.imageUrl ? (
+                            <img src={c.imageUrl} alt={c.title} className="h-14 w-20 shrink-0 rounded-lg border border-slate-200 object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+                              <ImageIcon className="h-5 w-5" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900">{c.title}</p>
+                            <p className="text-xs text-slate-500">{c.places} places · Clôture {formatDateFr(c.closeDate)} · {c.criteria.length} critère(s)</p>
+                          </div>
                         </div>
-                        <button type="button" onClick={() => setEditingCampaign(c)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold">
-                          Modifier critères & dates
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-3 py-1.5 text-xs font-semibold text-[#78350F] hover:bg-[#FEF3C7]">
+                            <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                            <span>Changer photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                handleQuickEntityPhotoUpload('campaign', c, e.target.files?.[0] || null);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          <button type="button" onClick={() => setEditingCampaign(c)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold">
+                            Modifier critères & dates
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {catalogSub === 'maintenance' && (
+                <div className="space-y-4">
+                  {editingService && (
+                    <form onSubmit={handleSaveService} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+                      <h4 className="font-bold text-slate-900">Modifier le service : {editingService.title}</h4>
+                      <div className="grid gap-4 sm:grid-cols-12">
+                        <div className="space-y-3 sm:col-span-7">
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-slate-600">Titre du service *</label>
+                            <input type="text" required value={editingService.title} onChange={(e) => setEditingService({ ...editingService, title: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-slate-600">Résumé affiché</label>
+                            <textarea rows={2} value={editingService.summary} onChange={(e) => setEditingService({ ...editingService, summary: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-slate-600">Tarification indicative</label>
+                              <input type="text" value={editingService.pricingLabel} onChange={(e) => setEditingService({ ...editingService, pricingLabel: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-slate-600">Zones couvertes</label>
+                              <input type="text" value={editingService.coverageZones} onChange={(e) => setEditingService({ ...editingService, coverageZones: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-5">
+                          <p className="text-xs font-bold text-slate-700">Photo du service Top Maintenance</p>
+                          {editingService.imageUrl ? (
+                            <img src={editingService.imageUrl} alt={editingService.title} className="h-36 w-full rounded border border-slate-200 bg-white object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="flex h-36 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-slate-300 bg-white text-slate-400">
+                              <ImageIcon className="h-6 w-6" />
+                              <span className="text-[11px]">Aucune photo</span>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100">
+                              <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                              <span>{editingService.imageUrl ? 'Changer la photo' : 'Ajouter une photo'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const url = await compressImageFile(file);
+                                    setEditingService({ ...editingService, imageUrl: url });
+                                  }
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                            {editingService.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingService({ ...editingService, imageUrl: '' })}
+                                className="rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#D90A14] hover:bg-red-50"
+                              >
+                                Retirer
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit" className="rounded-lg bg-[#D90A14] px-4 py-2 text-xs font-semibold text-white hover:bg-[#B80811]">Enregistrer le service</button>
+                        <button type="button" onClick={() => setEditingService(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-xs">Fermer</button>
+                      </div>
+                    </form>
+                  )}
+
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {data.services.map((svc) => (
+                      <div key={svc.id} className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        {svc.imageUrl ? (
+                          <img src={svc.imageUrl} alt={svc.title} className="h-44 w-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="flex h-44 w-full flex-col items-center justify-center gap-1 border-b border-slate-100 bg-slate-50 text-slate-400">
+                            <ImageIcon className="h-7 w-7" />
+                            <span className="text-[11px]">Sans photo</span>
+                          </div>
+                        )}
+                        <div className="flex flex-1 flex-col justify-between p-4">
+                          <div>
+                            <p className="font-bold text-slate-900">{svc.title}</p>
+                            <p className="mt-1 text-xs text-slate-500">{svc.pricingLabel}</p>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-3 py-1.5 text-xs font-semibold text-[#78350F] hover:bg-[#FEF3C7]">
+                              <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                              <span>Changer photo</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  handleQuickEntityPhotoUpload('service', svc, e.target.files?.[0] || null);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                            <button type="button" onClick={() => setEditingService(svc)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50">
+                              Modifier
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -3040,12 +3390,20 @@ export const AdminPage: React.FC = () => {
               {catalogSub === 'photos' && (
                 <div className="space-y-6">
                   <form onSubmit={handleAddPhoto} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2">
-                    <select value={newPhoto.pole} onChange={(e) => setNewPhoto({ ...newPhoto, pole: e.target.value as any })} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm">
-                      <option value="bourses">Programme de Bourses</option>
-                      <option value="academie">Lomakrev Académie</option>
-                      <option value="accueil">Accueil / Siège</option>
-                      <option value="maintenance">Top Maintenance</option>
-                    </select>
+                    <DualSelectInput
+                      fieldKey="photo_pole"
+                      value={newPhoto.pole || 'bourses'}
+                      onChange={(val) => setNewPhoto({ ...newPhoto, pole: val as any })}
+                      options={[
+                        { value: 'bourses', label: 'Programme de Bourses' },
+                        { value: 'academie', label: 'Lomakrev Académie' },
+                        { value: 'accueil', label: 'Accueil / Siège' },
+                        { value: 'maintenance', label: 'Top Maintenance' },
+                        { value: 'tech', label: 'Lomakrev Tech' },
+                      ]}
+                      placeholder="Pôle (sélection ou saisie)..."
+                      inputClassName="text-sm"
+                    />
                     <input type="text" placeholder="Édition (ex. Première édition — 2026)" value={newPhoto.edition || ''} onChange={(e) => setNewPhoto({ ...newPhoto, edition: e.target.value })} className="rounded border border-slate-300 px-3 py-2 text-sm" />
                     <input type="text" required placeholder="Légende de la photo" value={newPhoto.caption || ''} onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })} className="rounded border border-slate-300 px-3 py-2 text-sm sm:col-span-2" />
                     <div className="space-y-2">
@@ -3093,17 +3451,32 @@ export const AdminPage: React.FC = () => {
                         <div className="p-4 text-xs">
                           <p className="font-bold uppercase text-slate-500">{ph.pole} · {ph.edition}</p>
                           <p className="mt-1 text-slate-800">{ph.caption}</p>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              await apiFetch(`/api/admin/photos/${ph.id}`, { method: 'DELETE', headers: authHeaders() });
-                              pushToast('success', 'Photo retirée immédiatement.');
-                              refreshData();
-                            }}
-                            className="mt-3 text-[#D90A14] font-semibold hover:underline"
-                          >
-                            Retirer immédiatement
-                          </button>
+                          <div className="mt-3 flex flex-wrap items-center gap-3">
+                            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-2.5 py-1.5 font-semibold text-[#78350F] hover:bg-[#FEF3C7]">
+                              <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                              <span>Remplacer</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  handleQuickEntityPhotoUpload('gallery', ph, e.target.files?.[0] || null);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await apiFetch(`/api/admin/photos/${ph.id}`, { method: 'DELETE', headers: authHeaders() });
+                                pushToast('success', 'Photo retirée immédiatement.');
+                                refreshData();
+                              }}
+                              className="text-[#D90A14] font-semibold hover:underline"
+                            >
+                              Retirer immédiatement
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -3121,26 +3494,41 @@ export const AdminPage: React.FC = () => {
                   <h3 className="font-display text-lg font-bold text-slate-900">Constructeur de formulaires</h3>
                   <p className="text-xs text-slate-500">Ajoutez, renommez ou rendez obligatoire une question sans développeur (versionnement conservé).</p>
                 </div>
-                <select value={selectedFormKey} onChange={(e) => setSelectedFormKey(e.target.value as any)} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold">
-                  <option value="bourses">Candidature Bourses</option>
-                  <option value="academie">Inscription Académie</option>
-                  <option value="devis">Demande de Devis</option>
-                  <option value="intervention">Demande d’Intervention</option>
-                  <option value="contact">Contact</option>
-                </select>
+                <DualSelectInput
+                  fieldKey="form_builder_key"
+                  value={selectedFormKey}
+                  onChange={(val) => setSelectedFormKey(val as any)}
+                  options={[
+                    { value: 'bourses', label: 'Candidature Bourses' },
+                    { value: 'academie', label: 'Inscription Académie' },
+                    { value: 'devis', label: 'Demande de Devis' },
+                    { value: 'intervention', label: 'Demande d’Intervention' },
+                    { value: 'contact', label: 'Contact' },
+                  ]}
+                  placeholder="Formulaire (sélection ou saisie)..."
+                  className="w-full sm:w-64"
+                  inputClassName="text-sm font-semibold"
+                />
               </div>
 
               <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
                 <input type="text" placeholder="Libellé de la question" value={newField.label || ''} onChange={(e) => setNewField({ ...newField, label: e.target.value, name: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_') })} className="rounded border border-slate-300 bg-white px-3 py-2 text-xs sm:col-span-2" />
-                <select value={newField.type} onChange={(e) => setNewField({ ...newField, type: e.target.value as any })} className="rounded border border-slate-300 bg-white px-2.5 py-2 text-xs">
-                  <option value="text">Texte court</option>
-                  <option value="textarea">Texte long</option>
-                  <option value="number">Nombre</option>
-                  <option value="date">Date</option>
-                  <option value="select">Liste déroulante</option>
-                  <option value="radio">Choix unique</option>
-                  <option value="checkbox">Case à cocher</option>
-                </select>
+                <DualSelectInput
+                  fieldKey="form_field_type"
+                  value={newField.type || 'text'}
+                  onChange={(val) => setNewField({ ...newField, type: val as any })}
+                  options={[
+                    { value: 'text', label: 'Texte court' },
+                    { value: 'textarea', label: 'Texte long' },
+                    { value: 'number', label: 'Nombre' },
+                    { value: 'date', label: 'Date' },
+                    { value: 'select', label: 'Liste déroulante' },
+                    { value: 'radio', label: 'Choix unique' },
+                    { value: 'checkbox', label: 'Case à cocher' },
+                  ]}
+                  placeholder="Type de champ..."
+                  inputClassName="text-xs"
+                />
                 <input type="number" min={1} max={4} value={newField.step || 1} onChange={(e) => setNewField({ ...newField, step: Number(e.target.value) })} placeholder="Étape" className="rounded border border-slate-300 bg-white px-2.5 py-2 text-xs" />
                 <button
                   type="button"
@@ -3283,6 +3671,7 @@ export const AdminPage: React.FC = () => {
 
           {/* TAB 8: PARAMÈTRES DU SITE VITRINE & PHOTOS */}
           {activeTab === 'settings' && settingsDraft && (
+            <>
             <form onSubmit={handleSaveSettings} className="space-y-6">
               <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
                 <h3 className="font-display text-lg font-bold text-slate-900">Identité & Informations du site vitrine</h3>
@@ -3324,24 +3713,54 @@ export const AdminPage: React.FC = () => {
 
               {/* Photos configuration */}
               <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
-                <h3 className="font-display text-lg font-bold text-slate-900">Photos officielles & Griffes affichées sur le site</h3>
+                <div>
+                  <h3 className="font-display text-lg font-bold text-slate-900">Photos officielles, Arrière-plans & Griffes affichées sur le site</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Modifiez le logo, les photos principales de chaque pôle et les images d’arrière-plan de l’accueil et du pied de page, puis cliquez sur « Enregistrer tous les paramètres ».
+                  </p>
+                </div>
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {(
                     [
-                      { key: 'logoUrl', label: 'Logo officiel / Griffes' },
-                      { key: 'heroImageUrl', label: 'Photo principale Accueil' },
-                      { key: 'boursesFamilyImageUrl', label: 'Photo de famille Bourses (1ère édition)' },
-                      { key: 'academieHeroUrl', label: 'Photo Lomakrev Académie' },
-                      { key: 'maintenanceHeroUrl', label: 'Photo Top Maintenance' },
-                      { key: 'aboutImageUrl', label: 'Photo page À propos' },
-                    ] as { key: keyof SiteSettings; label: string }[]
-                  ).map((item) => (
-                    <div key={item.key} className="space-y-2 rounded-lg border border-slate-200 p-3">
-                      <p className="text-xs font-bold text-slate-800">{item.label}</p>
-                      <img src={String(settingsDraft[item.key] || '')} alt={item.label} className="h-28 w-full rounded bg-slate-100 object-cover" referrerPolicy="no-referrer" />
-                      <input type="file" accept="image/*" onChange={(e) => handleSettingsImageUpload(item.key, e.target.files?.[0] || null)} className="w-full text-[11px]" />
-                    </div>
-                  ))}
+                      { key: 'logoUrl', label: 'Logo officiel / Griffes', fallback: '' },
+                      { key: 'heroImageUrl', label: 'Photo principale Accueil', fallback: '/src/assets/images/poles_laptop_sales_bg_1795528398722.jpg' },
+                      { key: 'heroTextBgUrl', label: 'Arrière-plan bloc Accueil (Hero)', fallback: '/assets/aistudio/image_c323a419.png' },
+                      { key: 'polesBgImageUrl', label: 'Arrière-plan bande des 4 pôles', fallback: '/src/assets/images/poles_laptop_sales_bg_1795528398722.jpg' },
+                      { key: 'boursesFamilyImageUrl', label: 'Photo de famille Bourses (optionnelle)', fallback: '' },
+                      { key: 'academieHeroUrl', label: 'Photo Lomakrev Académie', fallback: '/src/assets/images/academie_camera_cachee_1795528400072.jpg' },
+                      { key: 'academieSectionBgUrl', label: 'Arrière-plan section Académie (Accueil)', fallback: '/src/assets/images/academie_camera_cachee_1795528400072.jpg' },
+                      { key: 'maintenanceHeroUrl', label: 'Photo Top Maintenance', fallback: '/src/assets/images/maintenance_workbench_hardware_1795528401708.jpg' },
+                      { key: 'aboutImageUrl', label: 'Photo page À propos', fallback: '/src/assets/images/poles_laptop_sales_bg_1795528398722.jpg' },
+                      { key: 'footerBgImageUrl', label: 'Arrière-plan pied de page', fallback: '/src/assets/images/footer_laptop_studio_1795528399505.jpg' },
+                    ] as { key: keyof SiteSettings; label: string; fallback: string }[]
+                  ).map((item) => {
+                    const currentImg = String(settingsDraft[item.key] ?? item.fallback ?? '');
+                    return (
+                      <div key={item.key} className="space-y-2 rounded-lg border border-slate-200 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold text-slate-800">{item.label}</p>
+                          {currentImg && item.key !== 'logoUrl' && (
+                            <button
+                              type="button"
+                              onClick={() => setSettingsDraft({ ...settingsDraft, [item.key]: '' })}
+                              className="text-[11px] font-semibold text-[#D90A14] hover:underline"
+                            >
+                              Retirer
+                            </button>
+                          )}
+                        </div>
+                        {currentImg ? (
+                          <img src={currentImg} alt={item.label} className="h-28 w-full rounded bg-slate-100 object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+                            <ImageIcon className="h-6 w-6" />
+                            <span className="text-[11px]">Aucune photo — ajoutez la vôtre</span>
+                          </div>
+                        )}
+                        <input type="file" accept="image/*" onChange={(e) => handleSettingsImageUpload(item.key, e.target.files?.[0] || null)} className="w-full text-[11px]" />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -3349,6 +3768,147 @@ export const AdminPage: React.FC = () => {
                 Enregistrer tous les paramètres
               </button>
             </form>
+
+            {data && (
+              <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 space-y-6">
+                <div>
+                  <h3 className="font-display text-lg font-bold text-slate-900">Photos des cartes Services, Bourses & Formations</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Ajoutez, remplacez ou retirez directement les photos affichées sur les pages Top Maintenance, Programme de Bourses et Lomakrev Académie (enregistrement immédiat).
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#D90A14]">Top Maintenance — Services</h4>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {data.services.map((svc) => (
+                      <div key={svc.id} className="space-y-2 rounded-lg border border-slate-200 p-3">
+                        <p className="truncate text-xs font-bold text-slate-800">{svc.title}</p>
+                        {svc.imageUrl ? (
+                          <img src={svc.imageUrl} alt={svc.title} className="h-28 w-full rounded bg-slate-100 object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+                            <ImageIcon className="h-6 w-6" />
+                            <span className="text-[11px]">Aucune photo</span>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-3 py-1.5 text-xs font-semibold text-[#78350F] hover:bg-[#FEF3C7]">
+                            <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                            <span>{svc.imageUrl ? 'Changer la photo' : 'Ajouter une photo'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                handleQuickEntityPhotoUpload('service', svc, e.target.files?.[0] || null);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          {svc.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickEntityPhotoUpload('service', svc, null, true)}
+                              className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-[#D90A14] hover:bg-red-50"
+                            >
+                              Retirer
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#D90A14]">Programme de Bourses — Campagnes</h4>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {data.campaigns.map((camp) => (
+                      <div key={camp.id} className="space-y-2 rounded-lg border border-slate-200 p-3">
+                        <p className="truncate text-xs font-bold text-slate-800">{camp.title}</p>
+                        {camp.imageUrl ? (
+                          <img src={camp.imageUrl} alt={camp.title} className="h-28 w-full rounded bg-slate-100 object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+                            <ImageIcon className="h-6 w-6" />
+                            <span className="text-[11px]">Aucune photo</span>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-3 py-1.5 text-xs font-semibold text-[#78350F] hover:bg-[#FEF3C7]">
+                            <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                            <span>{camp.imageUrl ? 'Changer la photo' : 'Ajouter une photo'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                handleQuickEntityPhotoUpload('campaign', camp, e.target.files?.[0] || null);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          {camp.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickEntityPhotoUpload('campaign', camp, null, true)}
+                              className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-[#D90A14] hover:bg-red-50"
+                            >
+                              Retirer
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#D90A14]">Lomakrev Académie — Formations</h4>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {data.formations.map((formItem) => (
+                      <div key={formItem.id} className="space-y-2 rounded-lg border border-slate-200 p-3">
+                        <p className="truncate text-xs font-bold text-slate-800">{formItem.title}</p>
+                        {formItem.imageUrl ? (
+                          <img src={formItem.imageUrl} alt={formItem.title} className="h-28 w-full rounded bg-slate-100 object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+                            <ImageIcon className="h-6 w-6" />
+                            <span className="text-[11px]">Aucune photo</span>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#F4B400] bg-[#FFFBEB] px-3 py-1.5 text-xs font-semibold text-[#78350F] hover:bg-[#FEF3C7]">
+                            <Camera className="h-3.5 w-3.5 text-[#D90A14]" />
+                            <span>{formItem.imageUrl ? 'Changer la photo' : 'Ajouter une photo'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                handleQuickEntityPhotoUpload('formation', formItem, e.target.files?.[0] || null);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          {formItem.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickEntityPhotoUpload('formation', formItem, null, true)}
+                              className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-[#D90A14] hover:bg-red-50"
+                            >
+                              Retirer
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            </>
           )}
 
           {/* TAB 9: UTILISATEURS, AUDIT & SAUVEGARDE */}
@@ -3376,11 +3936,14 @@ export const AdminPage: React.FC = () => {
                     <input type="text" required autoComplete="off" placeholder="Nom complet" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
                     <input type="email" required autoComplete="off" placeholder="E-mail" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
                     <input type="password" required minLength={8} autoComplete="new-password" placeholder="Mot de passe (8 caractères min.)" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-                    <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })} className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm">
-                      {Object.entries(ROLE_LABELS).map(([k, lbl]) => (
-                        <option key={k} value={k}>{lbl}</option>
-                      ))}
-                    </select>
+                    <DualSelectInput
+                      fieldKey="user_role"
+                      value={newUser.role}
+                      onChange={(val) => setNewUser({ ...newUser, role: val as UserRole })}
+                      options={Object.entries(ROLE_LABELS).map(([k, lbl]) => ({ value: k, label: lbl }))}
+                      placeholder="Rôle (sélection ou saisie)..."
+                      inputClassName="text-sm"
+                    />
                     <button type="submit" className="rounded-lg bg-[#D90A14] px-4 py-2 text-xs font-semibold text-white hover:bg-[#B80811]">Ajouter utilisateur</button>
                   </form>
 
@@ -3572,7 +4135,7 @@ export const AdminPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{ROLE_LABELS[u.role]}</span>
+                        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{ROLE_LABELS[u.role] || u.role}</span>
                         {isDirection && u.id !== user.id && (
                           <>
                             <button
@@ -3987,5 +4550,6 @@ export const AdminPage: React.FC = () => {
         </main>
       </div>
     </div>
+    </SelectOptionsProvider>
   );
 };

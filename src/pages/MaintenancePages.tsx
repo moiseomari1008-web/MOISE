@@ -13,6 +13,7 @@ import {
   type AttachmentFile,
 } from '../components/DynamicFormFields';
 import { clearFormDraft, loadFormDraft, saveFormDraft } from '../lib/offlineSync';
+import { OfficeAwareSelect } from '../components/DualSelectInput';
 
 export const MaintenanceHomePage: React.FC = () => {
   const { data, navigate } = useApp();
@@ -78,7 +79,9 @@ export const MaintenanceHomePage: React.FC = () => {
         <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {services.map((svc) => (
             <article key={svc.id} className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <PhotoFrame src={svc.imageUrl} alt={svc.title} aspectClass="aspect-[4/3]" className="border-b border-slate-100" />
+              {svc.imageUrl && (
+                <PhotoFrame src={svc.imageUrl} alt={svc.title} aspectClass="aspect-[4/3]" className="border-b border-slate-100" />
+              )}
               <div className="flex flex-1 flex-col p-5">
                 <h3 className="font-display text-lg font-bold text-slate-900">{svc.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">{svc.summary}</p>
@@ -128,10 +131,12 @@ export const MaintenanceServiceDetailPage: React.FC<{ slug: string }> = ({ slug 
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">
       <Breadcrumbs items={[{ label: 'Top Maintenance', to: '/maintenance' }, { label: service.title }]} />
       <div className="grid gap-10 lg:grid-cols-12">
-        <div className="lg:col-span-6">
-          <PhotoFrame src={service.imageUrl} alt={service.title} aspectClass="aspect-[4/3]" className="rounded-xl border border-slate-200" priority />
-        </div>
-        <div className="lg:col-span-6">
+        {service.imageUrl && (
+          <div className="lg:col-span-6">
+            <PhotoFrame src={service.imageUrl} alt={service.title} aspectClass="aspect-[4/3]" className="rounded-xl border border-slate-200" priority />
+          </div>
+        )}
+        <div className={service.imageUrl ? 'lg:col-span-6' : 'lg:col-span-12 max-w-3xl'}>
           <p className="text-xs font-bold uppercase tracking-wider text-[#D90A14]">Top Maintenance by Lomakrev</p>
           <h1 className="mt-2 font-display text-3xl font-extrabold text-slate-900">{service.title}</h1>
           <p className="mt-4 text-base leading-relaxed text-slate-600">{service.description}</p>
@@ -364,14 +369,21 @@ export const MaintenanceDevisPage: React.FC<{ enteredByAgent?: string | null; on
                     </div>
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-slate-800">Type de besoin</label>
-                      <select value={formState.typeTravaux} onChange={(e) => updateField('typeTravaux', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                        <option>Réparation</option>
-                        <option>Mise à niveau (RAM / SSD)</option>
-                        <option>Installation de logiciels</option>
-                        <option>Récupération de données</option>
-                        <option>Fourniture de postes neufs / quasi neufs</option>
-                        <option>Contrat d’entretien annuel</option>
-                      </select>
+                      <OfficeAwareSelect
+                        officeMode={Boolean(enteredByAgent)}
+                        fieldKey="office_devis_type_travaux"
+                        value={formState.typeTravaux}
+                        onChange={(val) => updateField('typeTravaux', val)}
+                        options={[
+                          'Réparation',
+                          'Mise à niveau (RAM / SSD)',
+                          'Installation de logiciels',
+                          'Récupération de données',
+                          'Fourniture de postes neufs / quasi neufs',
+                          'Contrat d’entretien annuel',
+                        ]}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                      />
                     </div>
                   </>
                 )}
@@ -381,12 +393,14 @@ export const MaintenanceDevisPage: React.FC<{ enteredByAgent?: string | null; on
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-800">Type de lieu</label>
-                        <select value={formState.typeLieu} onChange={(e) => updateField('typeLieu', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                          <option>Maison</option>
-                          <option>Boutique</option>
-                          <option>Bureau</option>
-                          <option>Dépôt / Entrepôt</option>
-                        </select>
+                        <OfficeAwareSelect
+                          officeMode={Boolean(enteredByAgent)}
+                          fieldKey="office_devis_type_lieu"
+                          value={formState.typeLieu}
+                          onChange={(val) => updateField('typeLieu', val)}
+                          options={['Maison', 'Boutique', 'Bureau', 'Dépôt / Entrepôt']}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                        />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-800">Nombre de caméras souhaitées</label>
@@ -396,19 +410,25 @@ export const MaintenanceDevisPage: React.FC<{ enteredByAgent?: string | null; on
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-800">Vision à distance sur téléphone</label>
-                        <select value={formState.visionDistance} onChange={(e) => updateField('visionDistance', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                          <option>Oui</option>
-                          <option>Non</option>
-                        </select>
+                        <OfficeAwareSelect
+                          officeMode={Boolean(enteredByAgent)}
+                          fieldKey="office_oui_non"
+                          value={formState.visionDistance}
+                          onChange={(val) => updateField('visionDistance', val)}
+                          options={['Oui', 'Non']}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                        />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-800">Durée d’enregistrement</label>
-                        <select value={formState.joursEnregistrement} onChange={(e) => updateField('joursEnregistrement', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                          <option>7 jours</option>
-                          <option>15 jours</option>
-                          <option>30 jours</option>
-                          <option>60 jours et plus</option>
-                        </select>
+                        <OfficeAwareSelect
+                          officeMode={Boolean(enteredByAgent)}
+                          fieldKey="office_devis_jours_enreg"
+                          value={formState.joursEnregistrement}
+                          onChange={(val) => updateField('joursEnregistrement', val)}
+                          options={['7 jours', '15 jours', '30 jours', '60 jours et plus']}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                        />
                       </div>
                     </div>
                   </>
@@ -423,12 +443,14 @@ export const MaintenanceDevisPage: React.FC<{ enteredByAgent?: string | null; on
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-800">Type de véhicules</label>
-                        <select value={formState.typeVehicules} onChange={(e) => updateField('typeVehicules', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                          <option>Voiture</option>
-                          <option>Moto</option>
-                          <option>Camion / Utilitaire</option>
-                          <option>Flotte mixte</option>
-                        </select>
+                        <OfficeAwareSelect
+                          officeMode={Boolean(enteredByAgent)}
+                          fieldKey="office_devis_type_vehicules"
+                          value={formState.typeVehicules}
+                          onChange={(val) => updateField('typeVehicules', val)}
+                          options={['Voiture', 'Moto', 'Camion / Utilitaire', 'Flotte mixte']}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                        />
                       </div>
                     </div>
                     <div>
@@ -463,7 +485,7 @@ export const MaintenanceDevisPage: React.FC<{ enteredByAgent?: string | null; on
                     <textarea rows={4} value={formState.marques} onChange={(e) => updateField('marques', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                   </div>
                 )}
-                <CustomFieldsRenderer fields={customFields} step={2} values={formState} onChange={updateField} />
+                <CustomFieldsRenderer fields={customFields} step={2} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
               </div>
             )}
 
@@ -491,10 +513,14 @@ export const MaintenanceDevisPage: React.FC<{ enteredByAgent?: string | null; on
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">Visite technique souhaitée avant devis ?</label>
-                  <select value={formState.visiteTechnique} onChange={(e) => updateField('visiteTechnique', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                    <option>Oui</option>
-                    <option>Non</option>
-                  </select>
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_oui_non"
+                    value={formState.visiteTechnique}
+                    onChange={(val) => updateField('visiteTechnique', val)}
+                    options={['Oui', 'Non']}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                  />
                 </div>
               </div>
             )}
@@ -504,11 +530,14 @@ export const MaintenanceDevisPage: React.FC<{ enteredByAgent?: string | null; on
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Vous êtes *</label>
-                    <select value={formState.profilDemandeur} onChange={(e) => updateField('profilDemandeur', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Particulier</option>
-                      <option>Entreprise</option>
-                      <option>Institution / ONG / École</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_profil_demandeur"
+                      value={formState.profilDemandeur}
+                      onChange={(val) => updateField('profilDemandeur', val)}
+                      options={['Particulier', 'Entreprise', 'Institution / ONG / École']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Nom complet *</label>
@@ -700,13 +729,20 @@ export const MaintenanceInterventionPage: React.FC<{ enteredByAgent?: string | n
               <div className="space-y-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">Type d’équipement *</label>
-                  <select value={formState.equipement} onChange={(e) => updateField('equipement', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                    <option>Ordinateur portable</option>
-                    <option>Ordinateur de bureau</option>
-                    <option>Caméras de surveillance</option>
-                    <option>Traceur GPS</option>
-                    <option>Réseau informatique / Wi-Fi</option>
-                  </select>
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_int_equipement"
+                    value={formState.equipement}
+                    onChange={(val) => updateField('equipement', val)}
+                    options={[
+                      'Ordinateur portable',
+                      'Ordinateur de bureau',
+                      'Caméras de surveillance',
+                      'Traceur GPS',
+                      'Réseau informatique / Wi-Fi',
+                    ]}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                  />
                 </div>
                 <input type="text" placeholder="Marque et modèle (ex. HP EliteBook 840 G8)" value={formState.marqueModele} onChange={(e) => updateField('marqueModele', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                 <textarea rows={3} placeholder="Description de la panne constatée *" value={formState.description} onChange={(e) => updateField('description', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
@@ -765,10 +801,14 @@ export const MaintenanceInterventionPage: React.FC<{ enteredByAgent?: string | n
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">Demi-journée souhaitée</label>
-                  <select value={formState.demiJournee} onChange={(e) => updateField('demiJournee', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                    <option>Matin (09h00 – 12h30)</option>
-                    <option>Après-midi (13h30 – 17h30)</option>
-                  </select>
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_int_demi_journee"
+                    value={formState.demiJournee}
+                    onChange={(val) => updateField('demiJournee', val)}
+                    options={['Matin (09h00 – 12h30)', 'Après-midi (13h30 – 17h30)']}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                  />
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-700">
                   <p><strong>Forfait diagnostic :</strong> {settings.maintenanceForfaitDiag || 'Tarif communiqué après diagnostic'}</p>
@@ -790,10 +830,17 @@ export const MaintenanceInterventionPage: React.FC<{ enteredByAgent?: string | n
                 />
                 <input type="email" placeholder="E-mail (facultatif)" value={formState.email} onChange={(e) => updateField('email', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <select value={formState.sousContrat} onChange={(e) => updateField('sousContrat', e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                    <option value="Non">Client ponctuel</option>
-                    <option value="Oui">Déjà client sous contrat</option>
-                  </select>
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_int_sous_contrat"
+                    value={formState.sousContrat}
+                    onChange={(val) => updateField('sousContrat', val)}
+                    options={[
+                      { value: 'Non', label: 'Client ponctuel' },
+                      { value: 'Oui', label: 'Déjà client sous contrat' },
+                    ]}
+                    className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                  />
                   {formState.sousContrat === 'Oui' && (
                     <input type="text" placeholder="N° de contrat" value={formState.numeroContrat} onChange={(e) => updateField('numeroContrat', e.target.value)} className="rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                   )}

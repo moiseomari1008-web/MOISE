@@ -4,6 +4,7 @@ import type { CustomFormField } from '../types/lomakrev';
 import { compressImageFile } from '../lib/offlineSync';
 import { buildFacebookShareUrl, buildWhatsAppShareUrl } from '../lib/pdfPrint';
 import { useApp } from '../context/AppContext';
+import { OfficeAwareSelect } from './DualSelectInput';
 
 export function validateRdcPhone(value: string): boolean {
   const clean = value.replace(/[\s\-().]/g, '');
@@ -202,7 +203,8 @@ export const CustomFieldsRenderer: React.FC<{
   step: number;
   values: Record<string, unknown>;
   onChange: (name: string, val: unknown) => void;
-}> = ({ fields, step, values, onChange }) => {
+  officeMode?: boolean;
+}> = ({ fields, step, values, onChange, officeMode = false }) => {
   const stepFields = fields
     .filter((f) => f.step === step)
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -231,18 +233,18 @@ export const CustomFieldsRenderer: React.FC<{
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none focus:border-[#D90A14]"
               />
             ) : f.type === 'select' ? (
-              <select
+              <OfficeAwareSelect
+                officeMode={officeMode}
+                fieldKey={`custom_${f.name}`}
                 value={String(val || '')}
-                onChange={(e) => onChange(f.name, e.target.value)}
+                onChange={(nextVal) => onChange(f.name, nextVal)}
+                options={[
+                  ...(!officeMode ? [{ value: '', label: 'Sélectionner...' }] : []),
+                  ...(f.options || []).map((opt) => ({ value: opt, label: opt })),
+                ]}
+                placeholder={f.placeholder || 'Sélectionner ou saisir...'}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-[#D90A14]"
-              >
-                <option value="">Sélectionner...</option>
-                {(f.options || []).map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
+              />
             ) : f.type === 'radio' ? (
               <div className="flex flex-wrap gap-2">
                 {(f.options || []).map((opt) => (

@@ -4,9 +4,6 @@ import { useApp } from '../context/AppContext';
 import { AnimatedPhotoShowcase, PhotoFrame, Reveal, type ShowcaseSlide } from '../components/MotionPrimitives';
 import { formatCurrencyCdf, formatCurrencyUsd, formatDateFr } from '../lib/pdfPrint';
 
-const IMG_CEREMONIE_DIPLOMES = '/src/assets/images/ceremonie_remise_diplomes_1795207522397.jpg';
-const IMG_ETUDES_ATELIER = '/src/assets/images/etudes_formation_pratique_1795207523291.jpg';
-
 export const HomePage: React.FC = () => {
   const { data, navigate, currency, setCurrency, addToCart, trackEvent } = useApp();
   if (!data) return null;
@@ -30,36 +27,30 @@ export const HomePage: React.FC = () => {
   };
 
   const heroSlides: ShowcaseSlide[] = dedupeSlides([
-    {
-      id: 'hero-siege',
-      url: settings.heroImageUrl,
-      alt: 'Siège LOMAKREV GROUP à Kinshasa Gombe',
-      tag: 'Siège LOMAKREV GROUP · Gombe',
-      caption: `${settings.address} — ${settings.openingHours}`,
-    },
-    {
-      id: 'hero-ceremonie',
-      url: IMG_CEREMONIE_DIPLOMES,
-      alt: 'Cérémonie de remise de diplômes et bourses Lomakrev',
-      tag: 'Cérémonies & Remise de diplômes',
-      caption: 'Remise officielle des certificats et attestations aux lauréats des programmes Lomakrev',
-    },
-    {
-      id: 'hero-etudes',
-      url: IMG_ETUDES_ATELIER,
-      alt: 'Séance d’études et ateliers pratiques Lomakrev Académie',
-      tag: 'Études & Formations pratiques',
-      caption: 'Travaux pratiques encadrés en bureautique avancée, cybersécurité et gestion de projet',
-    },
-    {
-      id: 'hero-academie',
-      url: settings.academieHeroUrl,
-      alt: 'Salle de formation Lomakrev Académie',
-      tag: 'Lomakrev Académie',
-      caption: '7 parcours certifiants pour les étudiants, professionnels et entreprises à Kinshasa',
-    },
+    ...(settings.heroImageUrl
+      ? [
+          {
+            id: 'hero-siege',
+            url: settings.heroImageUrl,
+            alt: 'Siège LOMAKREV GROUP à Kinshasa Gombe',
+            tag: 'Siège LOMAKREV GROUP · Gombe',
+            caption: `${settings.address} — ${settings.openingHours}`,
+          },
+        ]
+      : []),
+    ...(settings.academieHeroUrl
+      ? [
+          {
+            id: 'hero-academie',
+            url: settings.academieHeroUrl,
+            alt: 'Salle de formation Lomakrev Académie',
+            tag: 'Lomakrev Académie',
+            caption: '7 parcours certifiants pour les étudiants, professionnels et entreprises à Kinshasa',
+          },
+        ]
+      : []),
     ...(photos || [])
-      .filter((p) => p.pole === 'accueil' || p.pole === 'academie')
+      .filter((p) => (p.pole === 'accueil' || p.pole === 'academie') && p.consentVerified && p.url)
       .map((p) => ({
         id: `hero-ph-${p.id}`,
         url: p.url,
@@ -70,29 +61,19 @@ export const HomePage: React.FC = () => {
   ]);
 
   const boursesSlides: ShowcaseSlide[] = dedupeSlides([
-    {
-      id: 'brs-famille',
-      url: settings.boursesFamilyImageUrl,
-      alt: 'Photo de famille — Première édition du Programme de Bourses Lomakrev',
-      tag: 'Programme de Bourses',
-      caption: 'Première édition du Programme de Bourses LOMAKREV GROUP — Lauréats et formateurs',
-    },
-    {
-      id: 'brs-ceremonie',
-      url: IMG_CEREMONIE_DIPLOMES,
-      alt: 'Cérémonie de remise de diplômes des boursiers Lomakrev',
-      tag: 'Remise de diplômes & Cérémonie',
-      caption: 'Célébration des diplômés et bénéficiaires des bourses de formation numérique',
-    },
-    {
-      id: 'brs-etudes',
-      url: IMG_ETUDES_ATELIER,
-      alt: 'Ateliers d’études du Programme de Bourses et Académie',
-      tag: 'Études & Accompagnement',
-      caption: 'Sessions pratiques en présentiel à Gombe avec formateurs et encadreurs',
-    },
+    ...(settings.boursesFamilyImageUrl
+      ? [
+          {
+            id: 'brs-famille',
+            url: settings.boursesFamilyImageUrl,
+            alt: 'Photo de famille — Programme de Bourses Lomakrev',
+            tag: 'Programme de Bourses',
+            caption: 'Programme de Bourses LOMAKREV GROUP — Lauréats et formateurs',
+          },
+        ]
+      : []),
     ...(photos || [])
-      .filter((p) => p.pole === 'bourses' || p.pole === 'academie')
+      .filter((p) => (p.pole === 'bourses' || p.pole === 'academie') && p.consentVerified && p.url)
       .map((p) => ({
         id: `brs-ph-${p.id}`,
         url: p.url,
@@ -141,18 +122,24 @@ export const HomePage: React.FC = () => {
     },
   ];
 
+  const heroTextBg = settings.heroTextBgUrl ?? '/assets/aistudio/image_c323a419.png';
+  const polesBg = settings.polesBgImageUrl ?? '/src/assets/images/poles_laptop_sales_bg_1795528398722.jpg';
+  const academieBg = settings.academieSectionBgUrl ?? '/src/assets/images/academie_camera_cachee_1795528400072.jpg';
+
   return (
     <div>
       {/* 1. Hero Section — Red, Yellow & White Brand Presence */}
       <section className="border-b border-[#F4B400]/35 bg-white">
         <div className="mx-auto grid max-w-7xl items-center gap-6 px-4 py-8 sm:px-6 md:grid-cols-12 lg:gap-10 lg:py-12">
-          <div className="relative flex flex-col justify-center overflow-hidden rounded-2xl border border-[#F4B400]/50 bg-slate-950 p-5 sm:p-7 md:col-span-7">
-            <img
-              src="/assets/aistudio/image_c323a419.png"
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-100 brightness-125 contrast-105"
-            />
+          <div className={`relative flex flex-col justify-center overflow-hidden rounded-2xl border border-[#F4B400]/50 bg-slate-950 p-5 sm:p-7 ${heroSlides.length > 0 ? 'md:col-span-7' : 'md:col-span-12'}`}>
+            {heroTextBg && (
+              <img
+                src={heroTextBg}
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-100 brightness-125 contrast-105"
+              />
+            )}
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/55 to-slate-950/25"
@@ -188,31 +175,37 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-center md:col-span-5">
-            <div className="w-full max-w-[340px] sm:max-w-[390px] lg:max-w-[430px]">
-              <AnimatedPhotoShowcase
-                slides={heroSlides}
-                aspectClass="aspect-[16/10] max-h-[205px] sm:max-h-[235px] lg:max-h-[255px]"
-                className="rounded-xl border border-[#D90A14]/25 shadow-sm"
-                intervalMs={5200}
-                priority
-              />
+          {heroSlides.length > 0 && (
+            <div className="flex justify-center md:col-span-5">
+              <div className="w-full max-w-[340px] sm:max-w-[390px] lg:max-w-[430px]">
+                <AnimatedPhotoShowcase
+                  slides={heroSlides}
+                  aspectClass="aspect-[16/10] max-h-[205px] sm:max-h-[235px] lg:max-h-[255px]"
+                  className="rounded-xl border border-[#D90A14]/25 shadow-sm"
+                  intervalMs={5200}
+                  priority
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* 4 Pôles strip with computer-sales showroom backdrop */}
+        {/* 4 Pôles strip */}
         <div className="relative overflow-hidden border-t border-[#F4B400]/35 bg-[#FFFDF5]">
-          <img
-            src="/src/assets/images/poles_laptop_sales_bg_1795518479491.jpg"
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-80 brightness-110 contrast-105"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#FFFDF5]/42 via-[#FFFDF5]/50 to-[#FFFDF5]/56"
-          />
+          {polesBg && (
+            <>
+              <img
+                src={polesBg}
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-80 brightness-110 contrast-105"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#FFFDF5]/42 via-[#FFFDF5]/50 to-[#FFFDF5]/56"
+              />
+            </>
+          )}
           <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 divide-y divide-[#F4B400]/30 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
             {poles.map((pole, idx) => {
               const Icon = pole.icon;
@@ -288,12 +281,14 @@ export const HomePage: React.FC = () => {
               key={product.id}
               className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-transform hover:-translate-y-0.5"
             >
-              <PhotoFrame
-                src={product.images[0]}
-                alt={product.model}
-                aspectClass="aspect-[4/3]"
-                className="border-b border-slate-100"
-              />
+              {product.images?.[0] && (
+                <PhotoFrame
+                  src={product.images[0]}
+                  alt={product.model}
+                  aspectClass="aspect-[4/3]"
+                  className="border-b border-slate-100"
+                />
+              )}
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span className="font-semibold text-slate-700">{product.brand}</span>
@@ -351,18 +346,20 @@ export const HomePage: React.FC = () => {
         </div>
       </Reveal>
 
-      {/* 3. Campagne de Bourse en cours + Photo de famille 1ère édition */}
+      {/* 3. Campagne de Bourse en cours */}
       <Reveal className="border-y border-[#F4B400]/35 bg-[#FFFDF5]">
         <div className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-12 lg:gap-12 lg:py-20">
-          <div className="mx-auto w-full max-w-lg md:col-span-6 md:max-w-none">
-            <AnimatedPhotoShowcase
-              slides={boursesSlides}
-              aspectClass="aspect-[16/10] max-h-[250px] sm:max-h-[300px]"
-              className="rounded-xl border border-[#F4B400]/40"
-              intervalMs={4600}
-            />
-          </div>
-          <div className="md:col-span-6">
+          {boursesSlides.length > 0 && (
+            <div className="mx-auto w-full max-w-lg md:col-span-6 md:max-w-none">
+              <AnimatedPhotoShowcase
+                slides={boursesSlides}
+                aspectClass="aspect-[16/10] max-h-[250px] sm:max-h-[300px]"
+                className="rounded-xl border border-[#F4B400]/40"
+                intervalMs={4600}
+              />
+            </div>
+          )}
+          <div className={boursesSlides.length > 0 ? 'md:col-span-6' : 'md:col-span-12 max-w-3xl'}>
             <p className="text-xs font-bold uppercase tracking-wider text-[#B45309]">04 · Œuvre sociale Lomakrev</p>
             <h2 className="mt-2 font-display text-2xl font-bold text-slate-900 sm:text-3xl text-balance">
               {openCampaign ? openCampaign.title : 'Programme de Bourses Lomakrev'}
@@ -415,16 +412,20 @@ export const HomePage: React.FC = () => {
       {/* 4. Lomakrev Académie + Chiffres clés & Publics */}
       <Reveal className="relative overflow-hidden bg-white">
         <div className="relative">
-          <img
-            src="/src/assets/images/academie_camera_cachee_1795519273657.jpg"
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-45 brightness-105"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/75 via-white/60 to-white/72"
-          />
+          {academieBg && (
+            <>
+              <img
+                src={academieBg}
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-45 brightness-105"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/75 via-white/60 to-white/72"
+              />
+            </>
+          )}
           <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-20">
             <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
               <div className="lg:col-span-5">

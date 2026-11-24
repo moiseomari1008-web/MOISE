@@ -207,6 +207,16 @@ db.exec(`
     FOREIGN KEY (notification_id) REFERENCES admin_notifications(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS admin_select_options (
+    id TEXT PRIMARY KEY,
+    field_key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    label TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(field_key, value)
+  );
 `);
 
 // Safe migration for existing SQLite databases (profile columns on users)
@@ -221,13 +231,13 @@ db.exec(`
 
 // --- Initial Seed Data ---
 const OFFICIAL_LOGO = '/assets/aistudio/WhatsApp_Image_2026-11-20_at_11.31.55_6695b86a.jpeg';
-const IMG_HERO = '/src/assets/images/hero_lomakrev_gombe_1795171050463.jpg';
-const IMG_LAPTOP_G8 = '/src/assets/images/product_hp_elitebook_840_1795171050572.jpg';
-const IMG_LAPTOP_G6 = '/src/assets/images/product_hp_elitebook_g6_1795171050610.jpg';
-const IMG_ACADEMIE = '/src/assets/images/academie_formation_salle_1795171050542.jpg';
-const IMG_BOURSES = '/src/assets/images/bourses_premiere_edition_1795171050443.jpg';
-const IMG_MAINT_TECH = '/src/assets/images/maintenance_atelier_tech_1795171051130.jpg';
-const IMG_MAINT_CAM = '/src/assets/images/maintenance_cameras_gps_1795171050154.jpg';
+const IMG_SHOWROOM = '/src/assets/images/poles_laptop_sales_bg_1795528398722.jpg';
+const IMG_ACADEMIE_LAB = '/src/assets/images/academie_camera_cachee_1795528400072.jpg';
+const IMG_FOOTER_STUDIO = '/src/assets/images/footer_laptop_studio_1795528399505.jpg';
+const IMG_LAPTOP_G8 = '/src/assets/images/product_laptop_pro_g8_1795528400810.jpg';
+const IMG_LAPTOP_WORKSTATION = '/src/assets/images/product_laptop_workstation_1795528401444.jpg';
+const IMG_MAINT_WORKBENCH = '/src/assets/images/maintenance_workbench_hardware_1795528401708.jpg';
+const IMG_MAINT_CAM_GPS = '/src/assets/images/maintenance_security_gps_1795528402868.jpg';
 
 const defaultSettings: SiteSettings = {
   siteName: 'Lomakrev',
@@ -249,11 +259,15 @@ const defaultSettings: SiteSettings = {
   instagramUrl: 'https://instagram.com/Lomakrevgroup',
   linkedinUrl: 'https://linkedin.com/company/lomakrevgroup',
   logoUrl: OFFICIAL_LOGO,
-  heroImageUrl: IMG_HERO,
-  aboutImageUrl: IMG_HERO,
-  academieHeroUrl: IMG_ACADEMIE,
-  boursesFamilyImageUrl: IMG_BOURSES,
-  maintenanceHeroUrl: IMG_MAINT_TECH,
+  heroImageUrl: IMG_SHOWROOM,
+  aboutImageUrl: IMG_SHOWROOM,
+  academieHeroUrl: IMG_ACADEMIE_LAB,
+  boursesFamilyImageUrl: '',
+  maintenanceHeroUrl: IMG_MAINT_WORKBENCH,
+  heroTextBgUrl: '/assets/aistudio/image_c323a419.png',
+  polesBgImageUrl: IMG_SHOWROOM,
+  academieSectionBgUrl: IMG_ACADEMIE_LAB,
+  footerBgImageUrl: IMG_FOOTER_STUDIO,
   usdToCdfRate: 2850,
   rateDate: '2026-11-20',
   responseDelayText: 'Nous vous rappelons sous 24 h ouvrées',
@@ -337,7 +351,7 @@ function seedIfEmpty() {
         stockQty: 8,
         warranty: 'Vérifié atelier Lomakrev (modalités précisées à la commande)',
         category: 'Ultrabook Pro',
-        images: [IMG_LAPTOP_G8, IMG_LAPTOP_G6],
+        images: [IMG_LAPTOP_G8, IMG_LAPTOP_WORKSTATION],
         featured: true,
         sortOrder: 1,
         active: true,
@@ -383,7 +397,7 @@ function seedIfEmpty() {
         stockQty: 6,
         warranty: 'Contrôlé en atelier à Gombe',
         category: 'Bureautique & Gestion',
-        images: [IMG_LAPTOP_G6, IMG_LAPTOP_G8],
+        images: [IMG_LAPTOP_WORKSTATION, IMG_LAPTOP_G8],
         featured: true,
         sortOrder: 3,
         active: true,
@@ -406,7 +420,7 @@ function seedIfEmpty() {
         stockQty: 0,
         warranty: 'Sur devis et disponibilité confirmée sous 24 h',
         category: 'Entreprise',
-        images: [IMG_LAPTOP_G6],
+        images: [IMG_LAPTOP_WORKSTATION],
         featured: false,
         sortOrder: 4,
         active: true,
@@ -444,7 +458,7 @@ function seedIfEmpty() {
           '6. Cas pratiques d’entreprise : facturation, suivi de stock, paie simplifiée, budget, tableau de bord.',
           '7. Niveau avancé (module bourse « Excel avancée ») : Power Query, fonctions avancées, automatisation simple, protection des fichiers.',
         ],
-        imageUrl: IMG_ACADEMIE,
+        imageUrl: IMG_ACADEMIE_LAB,
         active: true,
         sortOrder: 1,
         sessions: [],
@@ -471,7 +485,7 @@ function seedIfEmpty() {
           '6. Graphiques, animations sobres et transitions.',
           '7. Présenter en public : messages clés, gestion du temps, exercice final de présentation.',
         ],
-        imageUrl: IMG_ACADEMIE,
+        imageUrl: IMG_ACADEMIE_LAB,
         active: true,
         sortOrder: 2,
         sessions: [],
@@ -499,7 +513,7 @@ function seedIfEmpty() {
           '7. Sauvegarde et récupération de données ; bases des réseaux (Wi-Fi, partage, imprimante).',
           '8. Accueil client et fiche d’intervention.',
         ],
-        imageUrl: IMG_MAINT_TECH,
+        imageUrl: IMG_MAINT_WORKBENCH,
         active: true,
         sortOrder: 3,
         sessions: [],
@@ -526,7 +540,7 @@ function seedIfEmpty() {
           '6. Sauvegardes et plan de reprise.',
           '7. Bonnes pratiques en entreprise : règles d’accès, sensibilisation du personnel, réaction à un incident.',
         ],
-        imageUrl: IMG_ACADEMIE,
+        imageUrl: IMG_ACADEMIE_LAB,
         active: true,
         sortOrder: 4,
         sessions: [
@@ -568,7 +582,7 @@ function seedIfEmpty() {
           '6. Usage responsable : vérification des informations, confidentialité, droits d’auteur.',
           '7. Projet final : automatiser une tâche réelle de son travail ou de son projet.',
         ],
-        imageUrl: IMG_ACADEMIE,
+        imageUrl: IMG_ACADEMIE_LAB,
         active: true,
         sortOrder: 5,
         sessions: [],
@@ -596,7 +610,7 @@ function seedIfEmpty() {
           '7. Financement : épargne, microcrédit, concours, partenaires.',
           '8. Plan d’affaires et présentation devant un jury.',
         ],
-        imageUrl: IMG_BOURSES,
+        imageUrl: IMG_LAPTOP_WORKSTATION,
         active: true,
         sortOrder: 6,
         sessions: [],
@@ -624,7 +638,7 @@ function seedIfEmpty() {
           '7. Méthodes agiles : Scrum, Kanban, outils numériques (Trello, Excel, MS Project).',
           '8. Communication, leadership et clôture du projet ; étude de cas finale.',
         ],
-        imageUrl: IMG_ACADEMIE,
+        imageUrl: IMG_ACADEMIE_LAB,
         active: true,
         sortOrder: 7,
         sessions: [],
@@ -650,7 +664,7 @@ function seedIfEmpty() {
           'Intervention en atelier à Gombe ou sur site à Kinshasa pour vos ordinateurs portables et postes de bureau. Chaque appareil bénéficie d’un carnet d’entretien complet.',
         pricingLabel: 'Forfait diagnostic 15 USD (déduit si réparation) · ou sur devis',
         coverageZones: 'Kinshasa (Gombe, Lingwala, Kintambo, Ngaliema, Limete, Bandalungwa...)',
-        imageUrl: IMG_MAINT_TECH,
+        imageUrl: IMG_MAINT_WORKBENCH,
         highlights: ['Diagnostic approfondi', 'Remplacement pièces d’origine', 'Installation Windows & suites pro', 'Récupération de données'],
         active: true,
         sortOrder: 1,
@@ -665,7 +679,7 @@ function seedIfEmpty() {
           'Étude de site, pose propre, configuration NVR/DVR, enregistrement sécurisé et paramétrage de la vision à distance sur votre téléphone.',
         pricingLabel: 'Sur devis après visite technique',
         coverageZones: 'Kinshasa et provinces sur mission',
-        imageUrl: IMG_MAINT_CAM,
+        imageUrl: IMG_MAINT_CAM_GPS,
         highlights: ['Caméras IP/HD nocturnes', 'Vision en direct sur smartphone', 'Sauvegarde 7 à 30+ jours', 'Reprise d’installations existantes'],
         active: true,
         sortOrder: 2,
@@ -680,7 +694,7 @@ function seedIfEmpty() {
           'Sécurisez vos véhicules personnels et vos flottes d’entreprise avec suivi temps réel sur téléphone, historique des trajets et coupure moteur.',
         pricingLabel: 'Sur devis selon nombre de véhicules',
         coverageZones: 'Kinshasa — pose en atelier ou sur site flotte',
-        imageUrl: IMG_MAINT_CAM,
+        imageUrl: IMG_MAINT_CAM_GPS,
         highlights: ['Suivi temps réel 24/7', 'Coupure moteur à distance', 'Historique & kilométrage', 'Alertes sortie de zone'],
         active: true,
         sortOrder: 3,
@@ -695,7 +709,7 @@ function seedIfEmpty() {
           'Conception et déploiement de réseaux filaires et sans-fil fiables pour bureaux, écoles, ONG et cliniques.',
         pricingLabel: 'Sur devis après relevé technique',
         coverageZones: 'Kinshasa et environs',
-        imageUrl: IMG_HERO,
+        imageUrl: IMG_SHOWROOM,
         highlights: ['Câblage Cat6 structuré', 'Wi-Fi maillé haute densité', 'Partage imprimantes & NAS', 'Sécurisation routeur'],
         active: true,
         sortOrder: 4,
@@ -710,7 +724,7 @@ function seedIfEmpty() {
           'Un contrat sur mesure garantissant la continuité de vos opérations informatiques, caméras et réseaux avec délais d’intervention garantis.',
         pricingLabel: 'Sur devis selon taille du parc',
         coverageZones: 'Entreprises, institutions et ONG à Kinshasa',
-        imageUrl: IMG_MAINT_TECH,
+        imageUrl: IMG_MAINT_WORKBENCH,
         highlights: ['Support prioritaire sous 24 h', 'Visites préventives mensuelles', 'Carnet d’entretien par poste', 'Remplacement temporaire selon contrat'],
         active: true,
         sortOrder: 5,
@@ -743,7 +757,7 @@ function seedIfEmpty() {
         maxAge: 35,
         requireTwoApprovals: false,
         requiredDocuments: ['Pièce d’identité (Carte d’électeur, passeport ou carte d’étudiant avec date de naissance)'],
-        imageUrl: IMG_BOURSES,
+        imageUrl: IMG_ACADEMIE_LAB,
         statusOverride: 'auto',
         criteria: [
           { id: 'c1', label: 'Âge minimum 18 ans révolus', type: 'eliminatoire', fieldKey: 'age', operator: 'gte', expectedValue: '18', failReason: 'Âge inférieur à 18 ans à la date d’ouverture.' },
@@ -775,7 +789,7 @@ function seedIfEmpty() {
         maxAge: 35,
         requireTwoApprovals: true,
         requiredDocuments: ['Pièce d’identité', 'Carte d’étudiant ou CV (facultatif)'],
-        imageUrl: IMG_ACADEMIE,
+        imageUrl: IMG_LAPTOP_WORKSTATION,
         statusOverride: 'auto',
         criteria: [
           { id: 'c2_1', label: 'Âge minimum 18 ans révolus', type: 'eliminatoire', fieldKey: 'age', operator: 'gte', expectedValue: '18', failReason: 'Âge inférieur à 18 ans.' },
@@ -802,7 +816,7 @@ function seedIfEmpty() {
         maxAge: null,
         requireTwoApprovals: false,
         requiredDocuments: ['Pièce d’identité'],
-        imageUrl: IMG_BOURSES,
+        imageUrl: IMG_ACADEMIE_LAB,
         statusOverride: 'closed',
         criteria: [],
       },
@@ -813,17 +827,15 @@ function seedIfEmpty() {
     }
   }
 
-  // 7. Site Photos Gallery (Section 11)
+  // 7. Site Photos Gallery (Section 11) — uniquement matériel & espaces équipés (aucune photo de personnes par défaut)
   const photoCount = (db.prepare('SELECT COUNT(*) as c FROM site_photos').get() as { c: number }).c;
   if (photoCount === 0) {
     const seedPhotos: SitePhotoItem[] = [
-      { id: 'ph_1', pole: 'bourses', edition: 'Première édition — 2026', url: IMG_BOURSES, caption: 'Photo de famille de la première édition — Lauréats et formateurs à Kinshasa', consentVerified: true, sortOrder: 1 },
-      { id: 'ph_6', pole: 'bourses', edition: 'Cérémonie & Remise de diplômes', url: '/src/assets/images/ceremonie_remise_diplomes_1795207522397.jpg', caption: 'Cérémonie officielle de remise des diplômes et certificats aux lauréats', consentVerified: true, sortOrder: 2 },
-      { id: 'ph_2', pole: 'academie', edition: 'Première édition — 2026', url: IMG_ACADEMIE, caption: 'Séance pratique de formation en bureautique avancée et cybersécurité', consentVerified: true, sortOrder: 1 },
-      { id: 'ph_7', pole: 'academie', edition: 'Études & Ateliers pratiques', url: '/src/assets/images/etudes_formation_pratique_1795207523291.jpg', caption: 'Apprenants en atelier pratique Excel et cybersécurité au campus Gombe', consentVerified: true, sortOrder: 2 },
-      { id: 'ph_3', pole: 'accueil', edition: 'Siège Gombe', url: IMG_HERO, caption: 'Espace d’accueil et pôle numérique — Avenue des Étoiles n° 09, Gombe', consentVerified: true, sortOrder: 1 },
-      { id: 'ph_4', pole: 'maintenance', edition: 'Atelier Top Maintenance', url: IMG_MAINT_TECH, caption: 'Diagnostic carte mère et maintenance informatique en atelier', consentVerified: true, sortOrder: 1 },
-      { id: 'ph_5', pole: 'maintenance', edition: 'Sécurité & GPS', url: IMG_MAINT_CAM, caption: 'Installation de caméras de surveillance HD et suivi GPS de flotte', consentVerified: true, sortOrder: 2 },
+      { id: 'ph_accueil_showroom', pole: 'accueil', edition: 'Showroom Gombe', url: IMG_SHOWROOM, caption: 'Espace d’exposition ordinateurs professionnels — Avenue des Étoiles n° 09, Gombe', consentVerified: true, sortOrder: 1 },
+      { id: 'ph_acad_lab', pole: 'academie', edition: 'Campus Lomakrev', url: IMG_ACADEMIE_LAB, caption: 'Salle informatique équipée pour les formations pratiques à Gombe', consentVerified: true, sortOrder: 1 },
+      { id: 'ph_bourses_equip', pole: 'bourses', edition: 'Programme de Bourses', url: IMG_LAPTOP_G8, caption: 'Postes informatiques mis à disposition des bénéficiaires en présentiel', consentVerified: true, sortOrder: 1 },
+      { id: 'ph_maint_tech', pole: 'maintenance', edition: 'Atelier Top Maintenance', url: IMG_MAINT_WORKBENCH, caption: 'Banc de diagnostic matériel et maintenance informatique en atelier', consentVerified: true, sortOrder: 1 },
+      { id: 'ph_maint_sec', pole: 'maintenance', edition: 'Sécurité & GPS', url: IMG_MAINT_CAM_GPS, caption: 'Caméras de surveillance HD/IP et suivi GPS de flotte', consentVerified: true, sortOrder: 2 },
     ];
     const stmt = db.prepare('INSERT INTO site_photos (id, pole, data, sort_order) VALUES (?, ?, ?, ?)');
     for (const ph of seedPhotos) {
@@ -1064,10 +1076,145 @@ function seedIfEmpty() {
 
 seedIfEmpty();
 
+function restoreHardwareAndBackdropAssetsInDb() {
+  const migrationKey = 'migration_no_people_media_v1';
+  const alreadyMigrated = db.prepare('SELECT value FROM kv_store WHERE key = ?').get(migrationKey);
+  if (alreadyMigrated) return;
+
+  const now = new Date().toISOString();
+  const validGeneratedAssets = new Set([
+    IMG_SHOWROOM,
+    IMG_ACADEMIE_LAB,
+    IMG_FOOTER_STUDIO,
+    IMG_LAPTOP_G8,
+    IMG_LAPTOP_WORKSTATION,
+    IMG_MAINT_WORKBENCH,
+    IMG_MAINT_CAM_GPS,
+  ]);
+  const isBrokenOldGenerated = (val: unknown) =>
+    typeof val === 'string' && val.includes('/src/assets/images/') && !validGeneratedAssets.has(val);
+
+  // 1. Restore site_settings backdrops & equipment heroes (keep boursesFamilyImageUrl empty unless user uploaded one)
+  const settingsRow = db.prepare('SELECT value FROM kv_store WHERE key = ?').get('site_settings') as { value: string } | undefined;
+  if (settingsRow) {
+    const parsed = JSON.parse(settingsRow.value) as Record<string, any>;
+    const defaultsToRestore: Record<string, string> = {
+      logoUrl: OFFICIAL_LOGO,
+      heroImageUrl: IMG_SHOWROOM,
+      aboutImageUrl: IMG_SHOWROOM,
+      academieHeroUrl: IMG_ACADEMIE_LAB,
+      maintenanceHeroUrl: IMG_MAINT_WORKBENCH,
+      heroTextBgUrl: '/assets/aistudio/image_c323a419.png',
+      polesBgImageUrl: IMG_SHOWROOM,
+      academieSectionBgUrl: IMG_ACADEMIE_LAB,
+      footerBgImageUrl: IMG_FOOTER_STUDIO,
+    };
+    let changed = false;
+    for (const [k, defVal] of Object.entries(defaultsToRestore)) {
+      if (!parsed[k] || isBrokenOldGenerated(parsed[k])) {
+        parsed[k] = defVal;
+        changed = true;
+      }
+    }
+    if (isBrokenOldGenerated(parsed.boursesFamilyImageUrl)) {
+      parsed.boursesFamilyImageUrl = '';
+      changed = true;
+    }
+    if (changed) {
+      db.prepare('UPDATE kv_store SET value = ?, updated_at = ? WHERE key = ?').run(JSON.stringify(parsed), now, 'site_settings');
+    }
+  }
+
+  // 2. Restore products images if empty or broken old generated
+  const prodDefaultImages: Record<string, string[]> = {
+    prod_1: [IMG_LAPTOP_G8, IMG_LAPTOP_WORKSTATION],
+    prod_2: [IMG_LAPTOP_G8],
+    prod_3: [IMG_LAPTOP_WORKSTATION, IMG_LAPTOP_G8],
+    prod_4: [IMG_LAPTOP_WORKSTATION],
+  };
+  const prodRows = db.prepare('SELECT id, data FROM products').all() as { id: string; data: string }[];
+  for (const row of prodRows) {
+    const p = JSON.parse(row.data);
+    const cleaned = Array.isArray(p.images) ? p.images.filter((img: string) => !isBrokenOldGenerated(img)) : [];
+    if (cleaned.length === 0) {
+      p.images = prodDefaultImages[row.id] || [IMG_LAPTOP_G8];
+      db.prepare('UPDATE products SET data = ? WHERE id = ?').run(JSON.stringify(p), row.id);
+    } else if (cleaned.length !== (p.images?.length || 0)) {
+      p.images = cleaned;
+      db.prepare('UPDATE products SET data = ? WHERE id = ?').run(JSON.stringify(p), row.id);
+    }
+  }
+
+  // 3. Restore formations, maintenance_services, scholarship_campaigns
+  const formationDefaults: Record<string, string> = {
+    form_3: IMG_MAINT_WORKBENCH,
+    form_6: IMG_LAPTOP_WORKSTATION,
+  };
+  for (const row of db.prepare('SELECT id, data FROM formations').all() as { id: string; data: string }[]) {
+    const obj = JSON.parse(row.data);
+    if (!obj.imageUrl || isBrokenOldGenerated(obj.imageUrl)) {
+      obj.imageUrl = formationDefaults[row.id] || IMG_ACADEMIE_LAB;
+      db.prepare('UPDATE formations SET data = ? WHERE id = ?').run(JSON.stringify(obj), row.id);
+    }
+  }
+
+  const serviceDefaults: Record<string, string> = {
+    svc_1: IMG_MAINT_WORKBENCH,
+    svc_2: IMG_MAINT_CAM_GPS,
+    svc_3: IMG_MAINT_CAM_GPS,
+    svc_4: IMG_SHOWROOM,
+    svc_5: IMG_MAINT_WORKBENCH,
+  };
+  for (const row of db.prepare('SELECT id, data FROM maintenance_services').all() as { id: string; data: string }[]) {
+    const obj = JSON.parse(row.data);
+    if (!obj.imageUrl || isBrokenOldGenerated(obj.imageUrl)) {
+      obj.imageUrl = serviceDefaults[row.id] || IMG_MAINT_WORKBENCH;
+      db.prepare('UPDATE maintenance_services SET data = ? WHERE id = ?').run(JSON.stringify(obj), row.id);
+    }
+  }
+
+  const campaignDefaults: Record<string, string> = {
+    camp_2: IMG_LAPTOP_WORKSTATION,
+  };
+  for (const row of db.prepare('SELECT id, data FROM scholarship_campaigns').all() as { id: string; data: string }[]) {
+    const obj = JSON.parse(row.data);
+    if (!obj.imageUrl || isBrokenOldGenerated(obj.imageUrl)) {
+      obj.imageUrl = campaignDefaults[row.id] || IMG_ACADEMIE_LAB;
+      db.prepare('UPDATE scholarship_campaigns SET data = ? WHERE id = ?').run(JSON.stringify(obj), row.id);
+    }
+  }
+
+  // 4. Clean broken old site_photos and seed clean no-people equipment slides if gallery is empty
+  for (const row of db.prepare('SELECT id, data FROM site_photos').all() as { id: string; data: string }[]) {
+    const ph = JSON.parse(row.data);
+    if (isBrokenOldGenerated(ph.url)) {
+      db.prepare('DELETE FROM site_photos WHERE id = ?').run(row.id);
+    }
+  }
+  const remainingPhotos = (db.prepare('SELECT COUNT(*) as c FROM site_photos').get() as { c: number }).c;
+  if (remainingPhotos === 0) {
+    const cleanPhotos: SitePhotoItem[] = [
+      { id: 'ph_accueil_showroom', pole: 'accueil', edition: 'Showroom Gombe', url: IMG_SHOWROOM, caption: 'Espace d’exposition ordinateurs professionnels — Avenue des Étoiles n° 09, Gombe', consentVerified: true, sortOrder: 1 },
+      { id: 'ph_acad_lab', pole: 'academie', edition: 'Campus Lomakrev', url: IMG_ACADEMIE_LAB, caption: 'Salle informatique équipée pour les formations pratiques à Gombe', consentVerified: true, sortOrder: 1 },
+      { id: 'ph_bourses_equip', pole: 'bourses', edition: 'Programme de Bourses', url: IMG_LAPTOP_G8, caption: 'Postes informatiques mis à disposition des bénéficiaires en présentiel', consentVerified: true, sortOrder: 1 },
+      { id: 'ph_maint_tech', pole: 'maintenance', edition: 'Atelier Top Maintenance', url: IMG_MAINT_WORKBENCH, caption: 'Banc de diagnostic matériel et maintenance informatique en atelier', consentVerified: true, sortOrder: 1 },
+      { id: 'ph_maint_sec', pole: 'maintenance', edition: 'Sécurité & GPS', url: IMG_MAINT_CAM_GPS, caption: 'Caméras de surveillance HD/IP et suivi GPS de flotte', consentVerified: true, sortOrder: 2 },
+    ];
+    const pStmt = db.prepare('INSERT INTO site_photos (id, pole, data, sort_order) VALUES (?, ?, ?, ?)');
+    for (const ph of cleanPhotos) {
+      pStmt.run(ph.id, ph.pole, JSON.stringify(ph), ph.sortOrder);
+    }
+  }
+
+  db.prepare('INSERT OR REPLACE INTO kv_store (key, value, updated_at) VALUES (?, ?, ?)').run(migrationKey, 'done', now);
+}
+
+restoreHardwareAndBackdropAssetsInDb();
+
 // --- Helper Functions ---
 function getSettings(): SiteSettings {
   const row = db.prepare('SELECT value FROM kv_store WHERE key = ?').get('site_settings') as { value: string } | undefined;
-  return row ? JSON.parse(row.value) : defaultSettings;
+  return row ? { ...defaultSettings, ...JSON.parse(row.value) } : defaultSettings;
 }
 
 function nextReference(type: DossierType): string {
@@ -1216,6 +1363,7 @@ function createBackupFile(): string {
     forms: db.prepare('SELECT data FROM form_definitions').all().map((r: any) => JSON.parse(r.data)),
     dossiers: db.prepare('SELECT data FROM dossiers').all().map((r: any) => JSON.parse(r.data)),
     shortLinks: db.prepare('SELECT * FROM short_links').all(),
+    adminSelectOptions: db.prepare('SELECT id, field_key as fieldKey, value, label, created_by as createdBy, created_at as createdAt FROM admin_select_options').all(),
   };
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
   return filePath;
@@ -2559,22 +2707,27 @@ app.patch('/api/admin/dossiers/:id', requireAuth, (req: AuthedRequest, res) => {
     dossier.timeline.push({ at: now, actor: req.user!.name, action: `Grille d’évaluation mise à jour (Score total : ${dossier.totalScore})` });
   }
 
-  // Assign technician
+  // Assign technician (registered user or typed external technician name)
+  let matchedTechUserId: string | null = null;
   if (body.assignedToId !== undefined) {
     if (!['DIRECTION', 'TOP_MAINTENANCE'].includes(role)) {
       res.status(403).json({ error: 'Seule la Direction ou Top Maintenance peut affecter un technicien.' });
       return;
     }
-    if (body.assignedToId) {
+    const rawAssigned = String(body.assignedToId || '').trim();
+    if (rawAssigned) {
       const tech = db
-        .prepare("SELECT id, name FROM users WHERE id = ? AND role = 'TECHNICIEN' AND active = 1")
-        .get(body.assignedToId) as { id: string; name: string } | undefined;
-      if (!tech) {
-        res.status(400).json({ error: 'Technicien introuvable ou inactif.' });
-        return;
+        .prepare("SELECT id, name FROM users WHERE (id = ? OR LOWER(name) = LOWER(?)) AND role = 'TECHNICIEN' AND active = 1")
+        .get(rawAssigned, rawAssigned) as { id: string; name: string } | undefined;
+      if (tech) {
+        matchedTechUserId = tech.id;
+        dossier.assignedToId = tech.id;
+        dossier.assignedToName = tech.name;
+      } else {
+        const displayName = String(body.assignedToName || rawAssigned).trim().slice(0, 80);
+        dossier.assignedToId = rawAssigned.slice(0, 80);
+        dossier.assignedToName = displayName;
       }
-      dossier.assignedToId = tech.id;
-      dossier.assignedToName = tech.name;
       dossier.timeline.push({ at: now, actor: req.user!.name, action: `Technicien affecté : ${dossier.assignedToName}` });
     } else {
       dossier.assignedToId = null;
@@ -2653,7 +2806,7 @@ app.patch('/api/admin/dossiers/:id', requireAuth, (req: AuthedRequest, res) => {
       dossierId: dossier.id,
       dossierRef: dossier.reference,
       targetRoles: ['DIRECTION', 'TOP_MAINTENANCE'],
-      targetUserId: body.assignedToId,
+      targetUserId: matchedTechUserId,
       actorUserId: req.user!.id,
       linkTab: 'dossiers',
     });
@@ -2948,6 +3101,7 @@ app.post('/api/admin/services', requireAuth, requireRoles('DIRECTION', 'TOP_MAIN
     return;
   }
   if (!svc.id) svc.id = uid('svc');
+  if (!svc.slug) svc.slug = String(svc.title).toLowerCase().replace(/[^a-z0-9]+/g, '-');
   db.prepare('INSERT OR REPLACE INTO maintenance_services (id, slug, data, sort_order) VALUES (?, ?, ?, ?)').run(
     svc.id,
     svc.slug,
@@ -2994,7 +3148,18 @@ app.delete('/api/admin/photos/:id', requireAuth, requireRoles('DIRECTION', 'RESP
 app.put('/api/admin/settings', requireAuth, requireRoles('DIRECTION'), (req: AuthedRequest, res) => {
   const oldSettings = getSettings();
   const body = req.body || {};
-  const mediaKeys = ['logoUrl', 'heroImageUrl', 'aboutImageUrl', 'academieHeroUrl', 'boursesFamilyImageUrl', 'maintenanceHeroUrl'] as const;
+  const mediaKeys = [
+    'logoUrl',
+    'heroImageUrl',
+    'aboutImageUrl',
+    'academieHeroUrl',
+    'boursesFamilyImageUrl',
+    'maintenanceHeroUrl',
+    'heroTextBgUrl',
+    'polesBgImageUrl',
+    'academieSectionBgUrl',
+    'footerBgImageUrl',
+  ] as const;
   for (const key of mediaKeys) {
     if (body[key] !== undefined && !isSafeMediaUrl(body[key])) {
       res.status(400).json({ error: `URL d’image invalide pour ${key}.` });
@@ -3071,6 +3236,89 @@ app.delete('/api/admin/shortlinks/:id', requireAuth, requireRoles('DIRECTION'), 
   res.json({ ok: true });
 });
 
+// Admin Dual-Mode Select Options (Saisie + Sélection persistées en BDD)
+app.get('/api/admin/select-options', requireAuth, (_req: AuthedRequest, res) => {
+  const rows = db
+    .prepare('SELECT id, field_key as fieldKey, value, label, created_at as createdAt FROM admin_select_options ORDER BY created_at ASC')
+    .all() as { id: string; fieldKey: string; value: string; label: string; createdAt: string }[];
+  const optionsByField: Record<string, { id: string; fieldKey: string; value: string; label: string; createdAt: string }[]> = {};
+  for (const row of rows) {
+    if (!optionsByField[row.fieldKey]) optionsByField[row.fieldKey] = [];
+    optionsByField[row.fieldKey].push(row);
+  }
+  res.json({ optionsByField });
+});
+
+app.post('/api/admin/select-options', requireAuth, (req: AuthedRequest, res) => {
+  const fieldKey = String(req.body?.fieldKey || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_:-]/g, '');
+  const value = String(req.body?.value || '').trim().slice(0, 120);
+  const label = String(req.body?.label || value).trim().slice(0, 120);
+
+  if (!fieldKey || fieldKey.length < 2) {
+    res.status(400).json({ error: 'Clé de champ invalide.' });
+    return;
+  }
+  if (!value) {
+    res.status(400).json({ error: 'Veuillez saisir une valeur non vide.' });
+    return;
+  }
+
+  const filterOnlyKeys = new Set(['dossier_pole_filter', 'dossier_status_filter']);
+  if (req.user!.role === 'LECTURE_SEULE' && !filterOnlyKeys.has(fieldKey)) {
+    res.status(403).json({ error: 'Modification non autorisée en lecture seule.' });
+    return;
+  }
+
+  const existing = db
+    .prepare('SELECT id, field_key as fieldKey, value, label, created_at as createdAt FROM admin_select_options WHERE field_key = ? AND LOWER(value) = LOWER(?)')
+    .get(fieldKey, value) as { id: string; fieldKey: string; value: string; label: string; createdAt: string } | undefined;
+
+  let option = existing;
+  if (!existing) {
+    const id = uid('opt');
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO admin_select_options (id, field_key, value, label, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+      id,
+      fieldKey,
+      value,
+      label || value,
+      req.user!.id,
+      now
+    );
+    option = { id, fieldKey, value, label: label || value, createdAt: now };
+    recordAudit(req.user!, 'Ajout option liste déroulante', `${fieldKey} : ${label || value}`);
+  } else if (label && label !== existing.label) {
+    db.prepare('UPDATE admin_select_options SET label = ? WHERE id = ?').run(label, existing.id);
+    option = { ...existing, label };
+  }
+
+  const optionsForField = db
+    .prepare('SELECT id, field_key as fieldKey, value, label, created_at as createdAt FROM admin_select_options WHERE field_key = ? ORDER BY created_at ASC')
+    .all(fieldKey);
+
+  res.json({ option, optionsForField });
+});
+
+app.delete('/api/admin/select-options/:id', requireAuth, (req: AuthedRequest, res) => {
+  if (req.user!.role === 'LECTURE_SEULE') {
+    res.status(403).json({ error: 'Suppression non autorisée en lecture seule.' });
+    return;
+  }
+  const existing = db.prepare('SELECT field_key as fieldKey, label FROM admin_select_options WHERE id = ?').get(req.params.id) as
+    | { fieldKey: string; label: string }
+    | undefined;
+  if (!existing) {
+    res.status(404).json({ error: 'Option introuvable.' });
+    return;
+  }
+  db.prepare('DELETE FROM admin_select_options WHERE id = ?').run(req.params.id);
+  recordAudit(req.user!, 'Suppression option liste déroulante', `${existing.fieldKey} : ${existing.label}`);
+  res.json({ ok: true });
+});
+
 // Users & Roles Management
 app.get('/api/admin/users', requireAuth, (req: AuthedRequest, res) => {
   const rows = db
@@ -3103,7 +3351,8 @@ app.post('/api/admin/users', requireAuth, requireRoles('DIRECTION'), (req: Authe
     res.status(400).json({ error: 'Adresse e-mail invalide.' });
     return;
   }
-  if (!ALLOWED_ROLES.includes(role)) {
+  const cleanRole = String(role).trim().slice(0, 50) as UserRole;
+  if (!cleanRole || (!ALLOWED_ROLES.includes(cleanRole) && cleanRole.length < 2)) {
     res.status(400).json({ error: 'Rôle invalide.' });
     return;
   }
@@ -3125,8 +3374,8 @@ app.post('/api/admin/users', requireAuth, requireRoles('DIRECTION'), (req: Authe
   const now = new Date().toISOString();
   db.prepare(
     'INSERT INTO users (id, name, email, password_hash, role, active, two_factor_enabled, two_factor_code, must_change_password, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)'
-  ).run(id, rawName, rawEmail, hashPassword(effectivePassword), role, twoFactorEnabled ? 1 : 0, twoFactorCode, mustChange, now);
-  recordAudit(req.user!, 'Création utilisateur', `${rawEmail} (${role})`);
+  ).run(id, rawName, rawEmail, hashPassword(effectivePassword), cleanRole, twoFactorEnabled ? 1 : 0, twoFactorCode, mustChange, now);
+  recordAudit(req.user!, 'Création utilisateur', `${rawEmail} (${cleanRole})`);
   res.json({ ok: true, id });
 });
 
@@ -3137,11 +3386,12 @@ app.patch('/api/admin/users/:id', requireAuth, requireRoles('DIRECTION'), (req: 
     res.status(404).json({ error: 'Utilisateur introuvable.' });
     return;
   }
-  if (role !== undefined && !ALLOWED_ROLES.includes(role)) {
+  const cleanPatchRole = role !== undefined ? String(role).trim().slice(0, 50) : undefined;
+  if (cleanPatchRole !== undefined && !cleanPatchRole) {
     res.status(400).json({ error: 'Rôle invalide.' });
     return;
   }
-  const nextRole = role || existing.role;
+  const nextRole = cleanPatchRole || existing.role;
   const nextActive = active !== undefined ? (active ? 1 : 0) : existing.active;
   const next2fa = twoFactorEnabled !== undefined ? (twoFactorEnabled ? 1 : 0) : existing.two_factor_enabled;
   const next2faCode = next2fa ? existing.two_factor_code || String(crypto.randomInt(100000, 999999)) : null;

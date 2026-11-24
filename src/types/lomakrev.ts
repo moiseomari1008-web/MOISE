@@ -25,9 +25,17 @@ export interface UserAccount {
   createdAt: string;
 }
 
+export interface AdminSelectOption {
+  id: string;
+  fieldKey: string;
+  value: string;
+  label: string;
+  createdAt?: string;
+}
+
 export interface SitePhotoItem {
   id: string;
-  pole: 'accueil' | 'tech' | 'academie' | 'bourses' | 'maintenance';
+  pole: 'accueil' | 'tech' | 'academie' | 'bourses' | 'maintenance' | (string & {});
   edition?: string;
   url: string;
   caption: string;
@@ -60,6 +68,10 @@ export interface SiteSettings {
   academieHeroUrl: string;
   boursesFamilyImageUrl: string;
   maintenanceHeroUrl: string;
+  heroTextBgUrl?: string;
+  polesBgImageUrl?: string;
+  academieSectionBgUrl?: string;
+  footerBgImageUrl?: string;
   usdToCdfRate: number;
   rateDate: string;
   responseDelayText: string;
@@ -87,10 +99,10 @@ export interface TechProduct {
   storage: string;
   screen: string;
   otherSpecs: string;
-  condition: 'Neuf' | 'Quasi neuf' | 'Reconditionné';
+  condition: 'Neuf' | 'Quasi neuf' | 'Reconditionné' | (string & {});
   priceUsd: number;
   oldPriceUsd?: number | null;
-  availability: 'En stock' | 'Sur commande' | 'Épuisé';
+  availability: 'En stock' | 'Sur commande' | 'Épuisé' | (string & {});
   stockQty: number;
   warranty: string;
   category: string;
@@ -153,7 +165,7 @@ export interface MaintenanceService {
 export interface ScholarshipCriterion {
   id: string;
   label: string;
-  type: 'eliminatoire' | 'automatique' | 'equipe';
+  type: 'eliminatoire' | 'automatique' | 'equipe' | (string & {});
   fieldKey?: string;
   operator?: 'gte' | 'lte' | 'eq' | 'in' | 'not_empty';
   expectedValue?: string;
@@ -180,7 +192,7 @@ export interface ScholarshipCampaign {
   requiredDocuments: string[];
   imageUrl: string;
   criteria: ScholarshipCriterion[];
-  statusOverride?: 'auto' | 'open' | 'closed';
+  statusOverride?: 'auto' | 'open' | 'closed' | (string & {});
 }
 
 export type FormFieldType =
@@ -194,7 +206,8 @@ export type FormFieldType =
   | 'radio'
   | 'checkbox'
   | 'file'
-  | 'consent';
+  | 'consent'
+  | (string & {});
 
 export interface CustomFormField {
   id: string;
@@ -211,7 +224,7 @@ export interface CustomFormField {
 }
 
 export interface FormDefinition {
-  formKey: 'academie' | 'bourses' | 'devis' | 'intervention' | 'contact';
+  formKey: 'academie' | 'bourses' | 'devis' | 'intervention' | 'contact' | (string & {});
   version: number;
   updatedAt: string;
   customFields: CustomFormField[];

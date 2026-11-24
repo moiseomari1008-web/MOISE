@@ -12,6 +12,7 @@ import {
 } from '../components/DynamicFormFields';
 import { formatDateFr } from '../lib/pdfPrint';
 import { loadFormDraft, saveFormDraft, clearFormDraft } from '../lib/offlineSync';
+import { OfficeAwareSelect } from '../components/DualSelectInput';
 
 export const AcademieHomePage: React.FC = () => {
   const { data, navigate } = useApp();
@@ -19,12 +20,14 @@ export const AcademieHomePage: React.FC = () => {
   const formations = data.formations.filter((f) => f.active);
   const academiePhotos = data.photos.filter((p) => p.pole === 'academie' && p.consentVerified);
 
+  const heroPhotoUrl = academiePhotos[0]?.url || data.settings.academieHeroUrl;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
       <Breadcrumbs items={[{ label: 'Lomakrev Académie' }]} />
 
       <div className="grid items-center gap-8 border-b border-[#F4B400]/40 pb-10 lg:grid-cols-12">
-        <div className="lg:col-span-6">
+        <div className={heroPhotoUrl ? 'lg:col-span-6' : 'lg:col-span-12 max-w-3xl'}>
           <p className="text-xs font-bold uppercase tracking-wider text-[#D90A14]">Pôle 2 · Lomakrev Académie — « Way of success »</p>
           <h1 className="mt-2 font-display text-3xl font-extrabold text-slate-900 sm:text-4xl text-balance">
             Formations numériques et entrepreneuriales pratiques
@@ -43,16 +46,18 @@ export const AcademieHomePage: React.FC = () => {
             </button>
           </div>
         </div>
-        <div className="lg:col-span-6">
-          <PhotoFrame
-            src={academiePhotos[0]?.url || data.settings.academieHeroUrl}
-            alt="Salle de formation Lomakrev Académie"
-            aspectClass="aspect-[16/10]"
-            className="rounded-xl border border-slate-200"
-            priority
-            caption={academiePhotos[0]?.caption || 'Campus Lomakrev — Kinshasa, Gombe'}
-          />
-        </div>
+        {heroPhotoUrl && (
+          <div className="lg:col-span-6">
+            <PhotoFrame
+              src={heroPhotoUrl}
+              alt="Salle de formation Lomakrev Académie"
+              aspectClass="aspect-[16/10]"
+              className="rounded-xl border border-slate-200"
+              priority
+              caption={academiePhotos[0]?.caption || 'Campus Lomakrev — Kinshasa, Gombe'}
+            />
+          </div>
+        )}
       </div>
 
       {/* 7 Formations Grid */}
@@ -61,7 +66,9 @@ export const AcademieHomePage: React.FC = () => {
           const openSessions = f.sessions.filter((s) => s.isOpen);
           return (
             <article key={f.id} className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <PhotoFrame src={f.imageUrl} alt={f.title} aspectClass="aspect-[16/9]" className="border-b border-slate-100" />
+              {f.imageUrl && (
+                <PhotoFrame src={f.imageUrl} alt={f.title} aspectClass="aspect-[16/9]" className="border-b border-slate-100" />
+              )}
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span className="font-mono-tabular font-semibold">0{idx + 1}. {f.durationHours} heures</span>
@@ -168,7 +175,9 @@ export const FormationDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
             <p className="mt-3 text-base leading-relaxed text-slate-600">{formation.objective}</p>
           </div>
 
-          <PhotoFrame src={formation.imageUrl} alt={formation.title} aspectClass="aspect-[16/9]" className="rounded-xl border border-slate-200" priority />
+          {formation.imageUrl && (
+            <PhotoFrame src={formation.imageUrl} alt={formation.title} aspectClass="aspect-[16/9]" className="rounded-xl border border-slate-200" priority />
+          )}
 
           <div className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="font-display text-xl font-bold text-slate-900">Programme détaillé par modules</h2>
@@ -472,36 +481,33 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
               <div className="space-y-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">Formation choisie *</label>
-                  <select
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_academie_formation"
                     value={formState.formationSlug}
-                    onChange={(e) => updateField('formationSlug', e.target.value)}
+                    onChange={(val) => updateField('formationSlug', val)}
+                    options={formations.map((f) => ({ value: f.slug, label: `${f.title} (${f.durationHours} h)` }))}
                     className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
-                  >
-                    {formations.map((f) => (
-                      <option key={f.slug} value={f.slug}>
-                        {f.title} ({f.durationHours} h)
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">Session *</label>
-                  <select
+                  <OfficeAwareSelect
+                    officeMode={Boolean(enteredByAgent)}
+                    fieldKey="office_academie_session"
                     value={formState.sessionCode}
-                    onChange={(e) => updateField('sessionCode', e.target.value)}
+                    onChange={(val) => updateField('sessionCode', val)}
+                    options={
+                      selectedFormation?.sessions.length
+                        ? selectedFormation.sessions.map((s) => ({
+                            value: s.code,
+                            label: `${s.code} — ${formatDateFr(s.startDate)} (${s.schedule})`,
+                          }))
+                        : [{ value: '2027-01', label: 'Relance 2027 — Pré-inscription' }]
+                    }
                     className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
-                  >
-                    {selectedFormation?.sessions.length ? (
-                      selectedFormation.sessions.map((s) => (
-                        <option key={s.code} value={s.code}>
-                          {s.code} — {formatDateFr(s.startDate)} ({s.schedule})
-                        </option>
-                      ))
-                    ) : (
-                      <option value="2027-01">Relance 2027 — Pré-inscription</option>
-                    )}
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -539,7 +545,7 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
                     ))}
                   </div>
                 </div>
-                <CustomFieldsRenderer fields={customFields} step={1} values={formState} onChange={updateField} />
+                <CustomFieldsRenderer fields={customFields} step={1} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
               </div>
             )}
 
@@ -563,10 +569,14 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Sexe *</label>
-                    <select value={formState.sexe} onChange={(e) => updateField('sexe', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option value="Masculin">Masculin</option>
-                      <option value="Féminin">Féminin</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_sexe"
+                      value={formState.sexe}
+                      onChange={(val) => updateField('sexe', val)}
+                      options={['Masculin', 'Féminin']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Date de naissance *</label>
@@ -607,7 +617,7 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
                     </div>
                   </div>
                 )}
-                <CustomFieldsRenderer fields={customFields} step={2} values={formState} onChange={updateField} />
+                <CustomFieldsRenderer fields={customFields} step={2} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
               </div>
             )}
 
@@ -616,45 +626,56 @@ export const AcademieInscriptionPage: React.FC<{ enteredByAgent?: string | null;
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Niveau d’études</label>
-                    <select value={formState.niveauEtudes} onChange={(e) => updateField('niveauEtudes', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Secondaire / Diplôme d’État</option>
-                      <option>Graduat / Licence</option>
-                      <option>Master / Doctorat</option>
-                      <option>Autre</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_niveau_etudes"
+                      value={formState.niveauEtudes}
+                      onChange={(val) => updateField('niveauEtudes', val)}
+                      options={['Secondaire / Diplôme d’État', 'Graduat / Licence', 'Master / Doctorat', 'Autre']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Situation actuelle</label>
-                    <select value={formState.situation} onChange={(e) => updateField('situation', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Étudiant</option>
-                      <option>Employé / Salarié</option>
-                      <option>Entrepreneur / Indépendant</option>
-                      <option>En recherche d’emploi</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_situation"
+                      value={formState.situation}
+                      onChange={(val) => updateField('situation', val)}
+                      options={['Étudiant', 'Employé / Salarié', 'Entrepreneur / Indépendant', 'En recherche d’emploi']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Niveau en informatique</label>
-                    <select value={formState.niveauInfo} onChange={(e) => updateField('niveauInfo', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Débutant</option>
-                      <option>Intermédiaire</option>
-                      <option>Avancé</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_niveau_info"
+                      value={formState.niveauInfo}
+                      onChange={(val) => updateField('niveauInfo', val)}
+                      options={['Débutant', 'Intermédiaire', 'Avancé']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-800">Avez-vous un ordinateur portable ?</label>
-                    <select value={formState.portable} onChange={(e) => updateField('portable', e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base">
-                      <option>Oui</option>
-                      <option>Non</option>
-                    </select>
+                    <OfficeAwareSelect
+                      officeMode={Boolean(enteredByAgent)}
+                      fieldKey="office_oui_non"
+                      value={formState.portable}
+                      onChange={(val) => updateField('portable', val)}
+                      options={['Oui', 'Non']}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-base"
+                    />
                   </div>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-800">Vos attentes pour cette formation</label>
                   <textarea rows={3} value={formState.attentes} onChange={(e) => updateField('attentes', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base" />
                 </div>
-                <CustomFieldsRenderer fields={customFields} step={3} values={formState} onChange={updateField} />
+                <CustomFieldsRenderer fields={customFields} step={3} values={formState} onChange={updateField} officeMode={Boolean(enteredByAgent)} />
               </div>
             )}
 
